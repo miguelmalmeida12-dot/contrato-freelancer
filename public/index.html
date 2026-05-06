@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gerador de Contratos · Freelancer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --ink: #1A1612;
+    --ink2: #5C5448;
+    --ink3: #A09890;
+    --accent: #C8502A;
+    --accent2: #E8A87C;
+    --border: #E2DDD6;
+    --border2: #CEC8BF;
+    --green: #2D6A4F;
+    --green-bg: #D8F3DC;
+    --radius: 3px;
+    --font-display: 'DM Serif Display', Georgia, serif;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ── LAYOUT ── */
+  .app { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 280px;
+    min-height: 100vh;
+    background: var(--ink);
+    color: #F7F5F0;
+    padding: 40px 32px;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .sidebar-logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: #F7F5F0;
+    margin-bottom: 8px;
+    line-height: 1.2;
+  }
+
+  .sidebar-logo span { color: var(--accent2); }
+
+  .sidebar-sub {
+    font-size: 11px;
+    color: #7A7268;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    margin-bottom: 48px;
+  }
+
+  .sidebar-section { margin-bottom: 40px; }
+
+  .sidebar-section-label {
+    font-size: 10px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: #5C5448;
+    margin-bottom: 12px;
+    font-weight: 600;
+  }
+
+  .type-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: #9A9088;
+    font-family: var(--font-body);
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    margin-bottom: 2px;
+    transition: all .15s;
+    border-left: 2px solid transparent;
+  }
+  .type-btn:hover { color: #F7F5F0; background: rgba(255,255,255,.05); }
+  .type-btn.active { color: #F7F5F0; border-left-color: var(--accent2); background: rgba(200,80,42,.12); }
+
+  .step-list { display: flex; flex-direction: column; gap: 4px; }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 13px;
+    color: #5C5448;
+    transition: color .15s;
+  }
+  .step-item.active { color: #F7F5F0; }
+  .step-item.done { color: var(--accent2); }
+  .step-dot {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    border: 1.5px solid #3A3530;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+    font-weight: 600;
+    transition: all .2s;
+  }
+  .step-item.active .step-dot { border-color: var(--accent2); color: var(--accent2); }
+  .step-item.done .step-dot { border-color: var(--accent2); background: var(--accent2); color: var(--ink); }
+
+  .sidebar-footer {
+    margin-top: auto;
+    font-size: 11px;
+    color: #3A3530;
+    line-height: 1.7;
+  }
+
+  /* ── MAIN ── */
+  .main {
+    margin-left: 280px;
+    flex: 1;
+    padding: 56px 64px;
+    max-width: calc(100vw - 280px);
+  }
+
+  .page-header { margin-bottom: 40px; }
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 36px;
+    color: var(--ink);
+    line-height: 1.1;
+    margin-bottom: 8px;
+  }
+  .page-title em { color: var(--accent); font-style: normal; }
+  .page-desc { font-size: 14px; color: var(--ink3); }
+
+  /* ── FORM CARD ── */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 36px 40px;
+    margin-bottom: 20px;
+  }
+
+  .form-section-title {
+    font-family: var(--font-display);
+    font-size: 20px;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .form-section-sub {
+    font-size: 13px;
+    color: var(--ink3);
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .field-grid.cols1 { grid-template-columns: 1fr; }
+  .field-grid.cols3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink2);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  label .req { color: var(--accent); margin-left: 2px; }
+
+  input[type=text], input[type=email], input[type=date], input[type=number], select, textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .15s, box-shadow .15s;
+    appearance: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(200,80,42,.1);
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 90px; line-height: 1.6; }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235C5448' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+
+  .field-hint { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+
+  /* ── STEP NAV ── */
+  .step-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 32px;
+  }
+
+  .btn {
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all .15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-ghost {
+    background: none;
+    border: 1px solid var(--border2);
+    color: var(--ink2);
+  }
+  .btn-ghost:hover { border-color: var(--ink2); color: var(--ink); }
+
+  .btn-primary {
+    background: var(--ink);
+    color: #F7F5F0;
+  }
+  .btn-primary:hover { background: var(--accent); }
+
+  .btn-download {
+    background: var(--green);
+    color: #fff;
+    padding: 14px 32px;
+    font-size: 15px;
+  }
+  .btn-download:hover { background: #1B4332; }
+  .btn-download:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── PROGRESS ── */
+  .progress-bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-bottom: 40px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width .4s cubic-bezier(.4,0,.2,1);
+  }
+
+  /* ── PREVIEW ── */
+  .preview-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 40px;
+  }
+
+  .preview-header {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 24px;
+    margin-bottom: 28px;
+  }
+  .preview-tipo {
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .preview-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+
+  .preview-section { margin-bottom: 24px; }
+  .preview-section-title {
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink2);
+    background: var(--bg);
+    padding: 6px 12px;
+    margin-bottom: 12px;
+    border-left: 3px solid var(--accent);
+  }
+
+  .preview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .preview-cell {
+    background: var(--surface);
+    padding: 10px 14px;
+  }
+  .preview-cell-label { font-size: 11px; color: var(--ink3); margin-bottom: 2px; font-weight: 600; }
+  .preview-cell-value { font-size: 14px; color: var(--ink); }
+  .preview-cell-value.empty { color: var(--border2); font-style: italic; }
+
+  .preview-body { font-size: 13px; color: var(--ink2); line-height: 1.8; }
+  .preview-var { color: var(--accent); font-weight: 500; }
+
+  .sig-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    margin-top: 48px;
+  }
+  .sig-block { border-top: 1.5px solid var(--ink); padding-top: 12px; }
+  .sig-role { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink3); }
+  .sig-name { font-size: 14px; font-weight: 500; color: var(--ink); margin-top: 4px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    right: 32px;
+    background: var(--green);
+    color: #fff;
+    padding: 14px 20px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0,0,0,.15);
+    z-index: 999;
+    animation: slideUp .3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* ── PDF TARGET ── */
+  #pdf-target { position: absolute; left: -9999px; top: 0; width: 794px; background: #fff; font-family: Arial, sans-serif; padding: 48px 56px; }
+  .pdf-header { border-bottom: 3px solid #1A1612; padding-bottom: 20px; margin-bottom: 24px; }
+  .pdf-tipo { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #C8502A; margin-bottom: 6px; }
+  .pdf-title { font-size: 24px; font-weight: 700; color: #1A1612; }
+  .pdf-sec { margin-bottom: 20px; }
+  .pdf-sec-title { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; background: #F7F5F0; padding: 5px 10px; color: #5C5448; font-weight: 700; border-left: 3px solid #C8502A; margin-bottom: 10px; }
+  .pdf-clause { margin-bottom: 16px; }
+  .pdf-clause-title { font-size: 12px; font-weight: 700; color: #1A1612; margin-bottom: 6px; border-bottom: 1px solid #E2DDD6; padding-bottom: 4px; }
+  .pdf-clause-body { font-size: 11px; color: #3A3530; line-height: 1.8; }
+  .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 11px; }
+  .pdf-table th { background: #1A1612; color: #fff; padding: 6px 10px; text-align: left; }
+  .pdf-table td { padding: 6px 10px; border-bottom: 1px solid #E2DDD6; }
+  .pdf-table tr:nth-child(even) td { background: #F7F5F0; }
+  .pdf-table .lbl { font-weight: 600; color: #5C5448; width: 40%; }
+  .pdf-var { color: #C8502A; font-style: italic; }
+  .pdf-sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
+  .pdf-sig { border-top: 1.5px solid #1A1612; padding-top: 10px; }
+  .pdf-sig-role { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #A09890; }
+  .pdf-sig-name { font-size: 12px; font-weight: 600; color: #1A1612; margin-top: 4px; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 32px 24px; max-width: 100vw; }
+    .field-grid { grid-template-columns: 1fr; }
+    .field-grid.cols3 { grid-template-columns: 1fr; }
+  }
+
+  .badge { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; margin-left: 8px; vertical-align: middle; }
+  .badge-required { background: #FEE2E2; color: #991B1B; }
+  .badge-optional { background: #F0FDF4; color: #166534; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="pdf-target"></div>
+
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+// ─── CONTRATO DEFINITIONS ────────────────────────────────────────────────────
+
+const TIPOS = [
+  { id: 'servicos', label: 'Prestação de Serviços', icon: '◆' },
+  { id: 'software', label: 'Desenvolvimento de Software', icon: '◈' },
+  { id: 'design', label: 'Design / Criação', icon: '◉' },
+  { id: 'influencer', label: 'Influencer Marketing', icon: '◎' },
+];
+
+const STEPS = {
+  servicos: ['Tipo', 'Contratante', 'Contratado', 'Escopo', 'Financeiro', 'Condições', 'Preview'],
+  software: ['Tipo', 'Cliente', 'Desenvolvedor', 'Projeto', 'Milestones', 'Pagamento', 'Condições', 'Preview'],
+  design: ['Tipo', 'Contratante', 'Designer', 'Escopo Criativo', 'Financeiro', 'Condições', 'Preview'],
+  influencer: ['Tipo', 'Marca', 'Influencer', 'Campanha', 'Conteúdo', 'Financeiro', 'Preview'],
+};
+
+// ─── FIELD DEFINITIONS PER CONTRACT ─────────────────────────────────────────
+
+const FIELDS = {
+  servicos: {
+    contratante: [
+      { key: 'cont_nome', label: 'Nome / Razão Social', type: 'text', req: true, placeholder: 'Ex: Empresa XPTO Ltda' },
+      { key: 'cont_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'cont_email', label: 'E-mail', type: 'email', req: true, placeholder: 'email@empresa.com' },
+      { key: 'cont_telefone', label: 'Telefone / WhatsApp', type: 'text', req: false, placeholder: '(11) 99999-9999' },
+      { key: 'cont_endereco', label: 'Endereço completo', type: 'text', req: false, placeholder: 'Rua, número, cidade – UF', full: true },
+    ],
+    contratado: [
+      { key: 'tado_nome', label: 'Seu nome / Razão Social', type: 'text', req: true, placeholder: 'Seu nome completo' },
+      { key: 'tado_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'tado_email', label: 'E-mail', type: 'email', req: true, placeholder: 'voce@email.com' },
+      { key: 'tado_telefone', label: 'Telefone / WhatsApp', type: 'text', req: false, placeholder: '(11) 99999-9999' },
+      { key: 'tado_endereco', label: 'Endereço completo', type: 'text', req: false, placeholder: 'Rua, número, cidade – UF', full: true },
+    ],
+    escopo: [
+      { key: 'descricao', label: 'Descrição detalhada dos serviços', type: 'textarea', req: true, placeholder: 'Descreva o que será feito, incluindo todas as entregas previstas...', full: true },
+      { key: 'modalidade', label: 'Modalidade de execução', type: 'select', req: true, options: ['Remota', 'Presencial', 'Híbrida'] },
+      { key: 'data_inicio', label: 'Data de início', type: 'date', req: true },
+      { key: 'data_fim', label: 'Data de conclusão prevista', type: 'date', req: true },
+      { key: 'num_revisoes', label: 'Revisões incluídas', type: 'number', req: true, placeholder: '3' },
+      { key: 'formatos_entrega', label: 'Formatos de entrega', type: 'text', req: false, placeholder: 'Ex: PDF, PNG, arquivos editáveis', full: true },
+      { key: 'cronograma', label: 'Cronograma de entregas parciais (opcional)', type: 'textarea', req: false, placeholder: 'Ex: Semana 1 – rascunho; Semana 2 – revisão...', full: true },
+    ],
+    financeiro: [
+      { key: 'valor_total', label: 'Valor total do contrato (R$)', type: 'text', req: true, placeholder: 'R$ 3.500,00' },
+      { key: 'forma_pagamento', label: 'Forma de pagamento', type: 'select', req: true, options: ['PIX', 'Transferência bancária', 'Boleto', 'Cartão (link)', 'Combinado'] },
+      { key: 'data_vencimento', label: 'Data(s) de vencimento', type: 'text', req: true, placeholder: 'Ex: 50% no início + 50% na entrega' },
+      { key: 'dados_bancarios', label: 'Chave PIX / Dados bancários', type: 'text', req: true, placeholder: 'CPF, e-mail ou chave aleatória' },
+      { key: 'data_primeiro_pag', label: 'Data do primeiro pagamento', type: 'date', req: true },
+    ],
+    condicoes: [
+      { key: 'prazo_retorno', label: 'Prazo para contratante fornecer materiais (dias)', type: 'number', req: true, placeholder: '5' },
+      { key: 'prazo_aprovacao', label: 'Prazo para aprovação de entregas (dias úteis)', type: 'number', req: true, placeholder: '3' },
+      { key: 'prazo_aviso', label: 'Aviso prévio para rescisão (dias)', type: 'number', req: true, placeholder: '15' },
+      { key: 'multa_rescisao', label: 'Multa rescisória (%)', type: 'number', req: true, placeholder: '20' },
+      { key: 'cidade_foro', label: 'Cidade do foro (para dúvidas legais)', type: 'text', req: true, placeholder: 'São Paulo – SP' },
+    ],
+  },
+
+  software: {
+    cliente: [
+      { key: 'cli_nome', label: 'Nome / Razão Social', type: 'text', req: true, placeholder: 'Empresa cliente' },
+      { key: 'cli_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '00.000.000/0001-00' },
+      { key: 'cli_rep', label: 'Representante legal', type: 'text', req: false, placeholder: 'Nome do responsável' },
+      { key: 'cli_email', label: 'E-mail', type: 'email', req: true, placeholder: 'cliente@empresa.com' },
+      { key: 'cli_tel', label: 'Telefone / WhatsApp', type: 'text', req: false, placeholder: '(11) 99999-9999' },
+    ],
+    desenvolvedor: [
+      { key: 'dev_nome', label: 'Nome / Razão Social', type: 'text', req: true, placeholder: 'Seu nome ou empresa' },
+      { key: 'dev_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'dev_email', label: 'E-mail', type: 'email', req: true, placeholder: 'voce@email.com' },
+      { key: 'dev_tel', label: 'Telefone / WhatsApp', type: 'text', req: false, placeholder: '(11) 99999-9999' },
+    ],
+    projeto: [
+      { key: 'proj_nome', label: 'Nome do projeto', type: 'text', req: true, placeholder: 'Ex: Plataforma de Agendamentos' },
+      { key: 'proj_tipo', label: 'Tipo de produto', type: 'select', req: true, options: ['Web App', 'App Mobile', 'API / Backend', 'Sistema Desktop', 'E-commerce', 'Outro'] },
+      { key: 'proj_plataformas', label: 'Plataformas-alvo', type: 'text', req: true, placeholder: 'Ex: Web, iOS, Android' },
+      { key: 'proj_stack', label: 'Stack tecnológica', type: 'text', req: false, placeholder: 'Ex: React, Node.js, PostgreSQL', full: true },
+      { key: 'proj_escopo', label: 'Escopo e funcionalidades principais', type: 'textarea', req: true, placeholder: 'Liste as funcionalidades incluídas no escopo...', full: true },
+    ],
+    milestones: [
+      { key: 'ms1_fase', label: 'Fase 1 – Nome', type: 'text', req: true, placeholder: 'Ex: Descoberta e UX' },
+      { key: 'ms1_entrega', label: 'Fase 1 – Entregável', type: 'text', req: true, placeholder: 'Ex: Wireframes aprovados' },
+      { key: 'ms1_prazo', label: 'Fase 1 – Prazo', type: 'date', req: true },
+      { key: 'ms1_valor', label: 'Fase 1 – Valor (R$)', type: 'text', req: true, placeholder: 'R$ 1.500,00' },
+      { key: 'ms2_fase', label: 'Fase 2 – Nome', type: 'text', req: false, placeholder: 'Ex: Desenvolvimento Frontend' },
+      { key: 'ms2_entrega', label: 'Fase 2 – Entregável', type: 'text', req: false, placeholder: 'Ex: Telas desenvolvidas' },
+      { key: 'ms2_prazo', label: 'Fase 2 – Prazo', type: 'date', req: false },
+      { key: 'ms2_valor', label: 'Fase 2 – Valor (R$)', type: 'text', req: false, placeholder: 'R$ 2.000,00' },
+      { key: 'ms3_fase', label: 'Fase 3 – Nome', type: 'text', req: false, placeholder: 'Ex: Integração e Backend' },
+      { key: 'ms3_entrega', label: 'Fase 3 – Entregável', type: 'text', req: false, placeholder: 'Ex: APIs funcionando' },
+      { key: 'ms3_prazo', label: 'Fase 3 – Prazo', type: 'date', req: false },
+      { key: 'ms3_valor', label: 'Fase 3 – Valor (R$)', type: 'text', req: false, placeholder: 'R$ 2.500,00' },
+    ],
+    pagamento: [
+      { key: 'sw_valor_total', label: 'Valor total do projeto (R$)', type: 'text', req: true, placeholder: 'R$ 8.000,00' },
+      { key: 'sw_pct_entrada', label: 'Percentual de entrada (%)', type: 'number', req: true, placeholder: '30' },
+      { key: 'sw_valor_entrada', label: 'Valor da entrada (R$)', type: 'text', req: true, placeholder: 'R$ 2.400,00' },
+      { key: 'sw_pct_final', label: 'Percentual do pagamento final (%)', type: 'number', req: true, placeholder: '30' },
+      { key: 'sw_valor_final', label: 'Valor do pagamento final (R$)', type: 'text', req: true, placeholder: 'R$ 2.400,00' },
+      { key: 'sw_forma_pag', label: 'Forma de pagamento', type: 'select', req: true, options: ['PIX', 'Transferência bancária', 'Boleto', 'Combinado'] },
+      { key: 'sw_dados_banco', label: 'Chave PIX / Dados bancários', type: 'text', req: true, placeholder: 'CPF, e-mail ou chave aleatória', full: true },
+    ],
+    condicoes: [
+      { key: 'sw_garantia', label: 'Prazo de garantia técnica (dias)', type: 'number', req: true, placeholder: '60' },
+      { key: 'sw_prazo_aceite', label: 'Prazo para aceite de cada entrega (dias úteis)', type: 'number', req: true, placeholder: '5' },
+      { key: 'sw_nda_anos', label: 'Prazo de confidencialidade (anos)', type: 'number', req: true, placeholder: '2' },
+      { key: 'sw_cidade_foro', label: 'Cidade do foro', type: 'text', req: true, placeholder: 'São Paulo – SP' },
+    ],
+  },
+
+  design: {
+    contratante: [
+      { key: 'dc_nome', label: 'Nome / Empresa', type: 'text', req: true, placeholder: 'Nome do cliente' },
+      { key: 'dc_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'dc_email', label: 'E-mail', type: 'email', req: true, placeholder: 'cliente@email.com' },
+      { key: 'dc_redes', label: 'Instagram / Site', type: 'text', req: false, placeholder: '@empresa ou www.empresa.com' },
+    ],
+    designer: [
+      { key: 'ds_nome', label: 'Seu nome / Estúdio', type: 'text', req: true, placeholder: 'Seu nome completo ou nome do estúdio' },
+      { key: 'ds_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'ds_email', label: 'E-mail', type: 'email', req: true, placeholder: 'voce@email.com' },
+      { key: 'ds_portfolio', label: 'Link do portfólio', type: 'text', req: false, placeholder: 'behance.net/seu-perfil' },
+    ],
+    escopo: [
+      { key: 'dg_tipo', label: 'Tipo de projeto', type: 'select', req: true, options: ['Identidade Visual', 'UI/UX', 'Branding', 'Social Media', 'Criação Gráfica', 'Outro'] },
+      { key: 'dg_entregas', label: 'Entregas principais', type: 'textarea', req: true, placeholder: 'Ex: Logo em 3 versões, paleta de cores, tipografia, mockups...', full: true },
+      { key: 'dg_formatos', label: 'Formatos de entrega', type: 'text', req: true, placeholder: 'Ex: AI, PDF, PNG, Figma', full: true },
+      { key: 'dg_opcoes', label: 'Número de opções de conceito inicial', type: 'number', req: true, placeholder: '2' },
+      { key: 'dg_versoes', label: 'Versões completas incluídas', type: 'number', req: true, placeholder: '2' },
+      { key: 'dg_revisoes', label: 'Rodadas de ajuste incluídas por entrega', type: 'number', req: true, placeholder: '3' },
+      { key: 'dg_prazo_conceito', label: 'Prazo para conceito inicial (dias úteis)', type: 'number', req: true, placeholder: '7' },
+      { key: 'dg_prazo_feedback', label: 'Prazo para feedback do cliente (dias úteis)', type: 'number', req: true, placeholder: '3' },
+    ],
+    financeiro: [
+      { key: 'dg_valor', label: 'Valor total (R$)', type: 'text', req: true, placeholder: 'R$ 2.500,00' },
+      { key: 'dg_sinal', label: 'Valor do sinal/entrada (R$)', type: 'text', req: true, placeholder: 'R$ 1.250,00' },
+      { key: 'dg_final', label: 'Valor do pagamento final (R$)', type: 'text', req: true, placeholder: 'R$ 1.250,00' },
+      { key: 'dg_forma', label: 'Forma de pagamento', type: 'select', req: true, options: ['PIX', 'Transferência bancária', 'Boleto', 'Combinado'] },
+      { key: 'dg_dados', label: 'Chave PIX / Dados bancários', type: 'text', req: true, placeholder: 'CPF, e-mail ou chave aleatória', full: true },
+    ],
+    condicoes: [
+      { key: 'dg_excl_pct', label: 'Adicional por exclusividade (%)', type: 'number', req: false, placeholder: '20' },
+      { key: 'dg_cidade', label: 'Cidade do foro', type: 'text', req: true, placeholder: 'São Paulo – SP' },
+    ],
+  },
+
+  influencer: {
+    marca: [
+      { key: 'mk_nome', label: 'Razão Social / Nome da marca', type: 'text', req: true, placeholder: 'Ex: Empresa ABC Ltda' },
+      { key: 'mk_cnpj', label: 'CNPJ / CPF', type: 'text', req: true, placeholder: '00.000.000/0001-00' },
+      { key: 'mk_rep', label: 'Representante', type: 'text', req: true, placeholder: 'Nome do responsável pela campanha' },
+      { key: 'mk_email', label: 'E-mail', type: 'email', req: true, placeholder: 'marketing@empresa.com' },
+      { key: 'mk_tel', label: 'Telefone / WhatsApp', type: 'text', req: false, placeholder: '(11) 99999-9999' },
+    ],
+    influencer: [
+      { key: 'inf_nome', label: 'Nome / Nome artístico', type: 'text', req: true, placeholder: 'Seu nome ou @ principal' },
+      { key: 'inf_cpf', label: 'CPF / CNPJ', type: 'text', req: true, placeholder: '000.000.000-00' },
+      { key: 'inf_email', label: 'E-mail', type: 'email', req: true, placeholder: 'voce@email.com' },
+      { key: 'inf_arrobas', label: 'Instagram / TikTok / YouTube', type: 'text', req: true, placeholder: '@sua-conta', full: true },
+      { key: 'inf_seguidores', label: 'Número de seguidores (data do contrato)', type: 'text', req: true, placeholder: 'Ex: 125.000' },
+    ],
+    campanha: [
+      { key: 'cp_produto', label: 'Produto / serviço a divulgar', type: 'text', req: true, placeholder: 'Ex: Curso de culinária online', full: true },
+      { key: 'cp_plataforma', label: 'Plataforma(s)', type: 'select', req: true, options: ['Instagram', 'TikTok', 'YouTube', 'Twitch', 'Pinterest', 'Multi-plataforma'] },
+      { key: 'cp_formatos', label: 'Formatos de conteúdo', type: 'text', req: true, placeholder: 'Ex: 3 Stories + 1 Reels + 1 Feed', full: true },
+      { key: 'cp_qtd', label: 'Quantidade de publicações', type: 'number', req: true, placeholder: '5' },
+      { key: 'cp_inicio', label: 'Início da campanha', type: 'date', req: true },
+      { key: 'cp_fim', label: 'Fim da campanha', type: 'date', req: true },
+      { key: 'cp_tempo_stories', label: 'Tempo mínimo nos Stories (horas)', type: 'number', req: false, placeholder: '24' },
+      { key: 'cp_tempo_feed', label: 'Tempo mínimo no Feed (dias)', type: 'number', req: false, placeholder: '90' },
+    ],
+    conteudo: [
+      { key: 'cn_mencao', label: '@Menção ou hashtag da marca', type: 'text', req: true, placeholder: '@marca ou #hashtag' },
+      { key: 'cn_link', label: 'Link / código de desconto (opcional)', type: 'text', req: false, placeholder: 'Ex: linktr.ee/marca ou CODIGO10' },
+      { key: 'cn_prazo_envio', label: 'Prazo de envio para aprovação (dias úteis antes)', type: 'number', req: true, placeholder: '3' },
+      { key: 'cn_prazo_aprov', label: 'Prazo da marca para aprovar (dias úteis)', type: 'number', req: true, placeholder: '2' },
+      { key: 'cn_rodadas', label: 'Máximo de rodadas de ajuste', type: 'number', req: true, placeholder: '2' },
+      { key: 'cn_excl_prazo', label: 'Prazo de não-concorrência após campanha (dias)', type: 'number', req: true, placeholder: '30' },
+      { key: 'cn_excl_cat', label: 'Categoria de não-concorrência', type: 'text', req: true, placeholder: 'Ex: cursos online de gastronomia', full: true },
+    ],
+    financeiro: [
+      { key: 'inf_valor', label: 'Valor total da parceria (R$)', type: 'text', req: true, placeholder: 'R$ 4.500,00' },
+      { key: 'inf_forma', label: 'Forma de pagamento', type: 'select', req: true, options: ['PIX', 'Transferência bancária', 'Nota Fiscal', 'Combinado'] },
+      { key: 'inf_dados', label: 'Chave PIX / Dados bancários', type: 'text', req: true, placeholder: 'CPF, e-mail ou chave aleatória' },
+      { key: 'inf_data_pag', label: 'Data de pagamento', type: 'date', req: true },
+      { key: 'inf_produtos', label: 'Produtos/brindes enviados (se houver)', type: 'text', req: false, placeholder: 'Ex: Kit de produtos + R$ 2.000 em dinheiro', full: true },
+      { key: 'inf_prazo_rel', label: 'Prazo para envio do relatório de métricas (dias)', type: 'number', req: true, placeholder: '7' },
+      { key: 'inf_cidade', label: 'Cidade do foro', type: 'text', req: true, placeholder: 'São Paulo – SP' },
+    ],
+  },
+};
+
+// ─── STEP CONTENT MAP ─────────────────────────────────────────────────────────
+
+const STEP_FIELD_MAP = {
+  servicos: ['', 'contratante', 'contratado', 'escopo', 'financeiro', 'condicoes', 'preview'],
+  software: ['', 'cliente', 'desenvolvedor', 'projeto', 'milestones', 'pagamento', 'condicoes', 'preview'],
+  design: ['', 'contratante', 'designer', 'escopo', 'financeiro', 'condicoes', 'preview'],
+  influencer: ['', 'marca', 'influencer', 'campanha', 'conteudo', 'financeiro', 'preview'],
+};
+
+const STEP_TITLES = {
+  contratante: ['Dados do Contratante', 'Quem está contratando o serviço'],
+  contratado: ['Seus Dados', 'Quem prestará o serviço'],
+  escopo: ['Escopo do Serviço', 'O que será entregue, quando e como'],
+  financeiro: ['Valores e Pagamento', 'Como e quando você receberá'],
+  condicoes: ['Condições Gerais', 'Revisões, rescisão e foro'],
+  cliente: ['Dados do Cliente', 'Quem está contratando o desenvolvimento'],
+  desenvolvedor: ['Seus Dados', 'O desenvolvedor ou agência'],
+  projeto: ['Detalhes do Projeto', 'Escopo técnico e funcionalidades'],
+  milestones: ['Fases e Entregas', 'Cronograma e pagamentos por fase'],
+  pagamento: ['Pagamento', 'Valores totais e forma de pagamento'],
+  designer: ['Seus Dados', 'O designer ou estúdio'],
+  marca: ['Dados da Marca', 'A empresa contratante da campanha'],
+  influencer: ['Seus Dados', 'O influencer ou criador de conteúdo'],
+  campanha: ['Dados da Campanha', 'Plataformas, formatos e cronograma'],
+  conteudo: ['Conteúdo e Aprovação', 'Diretrizes, menções e aprovação'],
+  preview: ['', ''],
+};
+
+// ─── PDF GENERATOR ─────────────────────────────────────────────────────────────
+
+function buildPdfContent(tipo, data) {
+  const v = (key, fallback = '___________________') => data[key] || `[${fallback}]`;
+
+  const templates = {
+    servicos: () => `
+      <div class="pdf-header">
+        <div class="pdf-tipo">Contrato · Prestação de Serviços</div>
+        <div class="pdf-title">Contrato de Prestação de Serviços</div>
+      </div>
+
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Qualificação das Partes</div>
+        <p style="font-size:11px;color:#5C5448;margin-bottom:8px;font-weight:600">CONTRATANTE:</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Razão Social</td><td>${v('cont_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('cont_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('cont_email')}</td></tr>
+          <tr><td class="lbl">Telefone</td><td>${v('cont_telefone')}</td></tr>
+          <tr><td class="lbl">Endereço</td><td>${v('cont_endereco')}</td></tr>
+        </table>
+        <p style="font-size:11px;color:#5C5448;margin:12px 0 8px;font-weight:600">CONTRATADO(A):</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Razão Social</td><td>${v('tado_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('tado_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('tado_email')}</td></tr>
+          <tr><td class="lbl">Telefone</td><td>${v('tado_telefone')}</td></tr>
+          <tr><td class="lbl">Endereço</td><td>${v('tado_endereco')}</td></tr>
+        </table>
+      </div>
+
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Cláusulas Contratuais</div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 1ª – Do Objeto</div>
+          <div class="pdf-clause-body">O presente contrato tem por objeto a prestação dos seguintes serviços: <strong>${v('descricao')}</strong><br>Modalidade de execução: ${v('modalidade')}</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 2ª – Do Prazo</div>
+          <div class="pdf-clause-body">Início: ${v('data_inicio')} &nbsp;|&nbsp; Conclusão prevista: ${v('data_fim')}<br>${data.cronograma ? 'Cronograma: ' + data.cronograma : ''}</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 3ª – Do Valor e Pagamento</div>
+          <div class="pdf-clause-body">
+            Valor total: <strong>${v('valor_total')}</strong> &nbsp;|&nbsp; Forma: ${v('forma_pagamento')}<br>
+            Vencimento: ${v('data_vencimento')} &nbsp;|&nbsp; Dados: ${v('dados_bancarios')}<br>
+            Primeiro pagamento até: ${v('data_primeiro_pag')}
+          </div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 4ª – Das Obrigações do Contratado</div>
+          <div class="pdf-clause-body">Executar os serviços com qualidade e dentro dos prazos. Revisões incluídas: ${v('num_revisoes')}. Formatos de entrega: ${v('formatos_entrega')}. Manter sigilo sobre informações do contratante.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 5ª – Das Obrigações do Contratante</div>
+          <div class="pdf-clause-body">Efetuar pagamentos nas datas acordadas. Fornecer materiais em até ${v('prazo_retorno')} dias após solicitação. Aprovar entregas em até ${v('prazo_aprovacao')} dias úteis.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 6ª – Da Propriedade Intelectual</div>
+          <div class="pdf-clause-body">Os direitos patrimoniais sobre os trabalhos serão transferidos ao CONTRATANTE apenas após quitação integral. O CONTRATADO poderá usar os trabalhos em seu portfólio profissional.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 7ª – Da Rescisão</div>
+          <div class="pdf-clause-body">Rescisão mediante aviso prévio de ${v('prazo_aviso')} dias. Multa rescisória de ${v('multa_rescisao')}% sobre o valor total em caso de rescisão unilateral pelo contratante.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 8ª – Da Relação entre as Partes</div>
+          <div class="pdf-clause-body">O presente contrato não estabelece vínculo empregatício. O CONTRATADO é profissional autônomo responsável por seus próprios encargos tributários.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Cláusula 9ª – Do Foro</div>
+          <div class="pdf-clause-body">As partes elegem o foro da comarca de ${v('cidade_foro')} para dirimir eventuais controvérsias.</div>
+        </div>
+      </div>
+
+      <div class="pdf-sigs">
+        <div class="pdf-sig">
+          <div class="pdf-sig-role">Contratante</div>
+          <div class="pdf-sig-name">${v('cont_nome')}</div>
+          <div style="font-size:10px;color:#A09890">CPF/CNPJ: ${v('cont_cpf')}</div>
+        </div>
+        <div class="pdf-sig">
+          <div class="pdf-sig-role">Contratado(a)</div>
+          <div class="pdf-sig-name">${v('tado_nome')}</div>
+          <div style="font-size:10px;color:#A09890">CPF/CNPJ: ${v('tado_cpf')}</div>
+        </div>
+      </div>
+    `,
+
+    software: () => `
+      <div class="pdf-header">
+        <div class="pdf-tipo">Contrato · Desenvolvimento de Software</div>
+        <div class="pdf-title">Contrato de Desenvolvimento de Software</div>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Qualificação das Partes</div>
+        <p style="font-size:11px;color:#5C5448;margin-bottom:8px;font-weight:600">CLIENTE:</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Empresa</td><td>${v('cli_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('cli_cpf')}</td></tr>
+          <tr><td class="lbl">Representante</td><td>${v('cli_rep')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('cli_email')}</td></tr>
+        </table>
+        <p style="font-size:11px;color:#5C5448;margin:12px 0 8px;font-weight:600">DESENVOLVEDOR(A):</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Empresa</td><td>${v('dev_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('dev_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('dev_email')}</td></tr>
+        </table>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Projeto</div>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome do Projeto</td><td>${v('proj_nome')}</td></tr>
+          <tr><td class="lbl">Tipo</td><td>${v('proj_tipo')}</td></tr>
+          <tr><td class="lbl">Plataformas</td><td>${v('proj_plataformas')}</td></tr>
+          <tr><td class="lbl">Stack</td><td>${v('proj_stack')}</td></tr>
+        </table>
+        <p style="font-size:11px;margin-top:10px;"><strong>Escopo:</strong> ${v('proj_escopo')}</p>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Milestones e Pagamentos</div>
+        <table class="pdf-table">
+          <tr><th>Fase</th><th>Entregável</th><th>Prazo</th><th>Valor</th></tr>
+          ${['1','2','3'].map(n => data[`ms${n}_fase`] ? `<tr><td>${data[`ms${n}_fase`]}</td><td>${v(`ms${n}_entrega`)}</td><td>${v(`ms${n}_prazo`)}</td><td>${v(`ms${n}_valor`)}</td></tr>` : '').join('')}
+        </table>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Cláusulas Contratuais</div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Pagamento Total</div>
+          <div class="pdf-clause-body">Valor total: <strong>${v('sw_valor_total')}</strong> | Entrada (${v('sw_pct_entrada')}%): ${v('sw_valor_entrada')} | Final (${v('sw_pct_final')}%): ${v('sw_valor_final')}<br>Forma: ${v('sw_forma_pag')} | Dados: ${v('sw_dados_banco')}</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Controle de Mudanças de Escopo</div>
+          <div class="pdf-clause-body">Qualquer alteração no escopo original deverá ser formalizada por escrito via Pedido de Mudança (Change Request) com descrição, impacto em prazo, custo adicional e assinatura de ambas as partes.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Garantia Técnica</div>
+          <div class="pdf-clause-body">Garantia de ${v('sw_garantia')} dias para correção de bugs após entrega final. Prazo de aceite de cada entrega: ${v('sw_prazo_aceite')} dias úteis. Ausência de resposta = aceite tácito.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Confidencialidade e Foro</div>
+          <div class="pdf-clause-body">NDA de ${v('sw_nda_anos')} anos. Foro: ${v('sw_cidade_foro')}.</div>
+        </div>
+      </div>
+      <div class="pdf-sigs">
+        <div class="pdf-sig"><div class="pdf-sig-role">Cliente</div><div class="pdf-sig-name">${v('cli_nome')}</div></div>
+        <div class="pdf-sig"><div class="pdf-sig-role">Desenvolvedor(a)</div><div class="pdf-sig-name">${v('dev_nome')}</div></div>
+      </div>
+    `,
+
+    design: () => `
+      <div class="pdf-header">
+        <div class="pdf-tipo">Contrato · Design e Criação</div>
+        <div class="pdf-title">Contrato de Prestação de Serviços de Design</div>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Qualificação das Partes</div>
+        <p style="font-size:11px;color:#5C5448;margin-bottom:8px;font-weight:600">CONTRATANTE:</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Empresa</td><td>${v('dc_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('dc_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('dc_email')}</td></tr>
+          <tr><td class="lbl">Instagram / Site</td><td>${v('dc_redes')}</td></tr>
+        </table>
+        <p style="font-size:11px;color:#5C5448;margin:12px 0 8px;font-weight:600">DESIGNER / ESTÚDIO:</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / Estúdio</td><td>${v('ds_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('ds_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('ds_email')}</td></tr>
+          <tr><td class="lbl">Portfólio</td><td>${v('ds_portfolio')}</td></tr>
+        </table>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Escopo Criativo</div>
+        <table class="pdf-table">
+          <tr><td class="lbl">Tipo de projeto</td><td>${v('dg_tipo')}</td></tr>
+          <tr><td class="lbl">Formatos de entrega</td><td>${v('dg_formatos')}</td></tr>
+          <tr><td class="lbl">Opções de conceito</td><td>${v('dg_opcoes')}</td></tr>
+          <tr><td class="lbl">Versões incluídas</td><td>${v('dg_versoes')}</td></tr>
+          <tr><td class="lbl">Rodadas de ajuste</td><td>${v('dg_revisoes')} por entrega</td></tr>
+          <tr><td class="lbl">Prazo para conceito</td><td>${v('dg_prazo_conceito')} dias úteis</td></tr>
+          <tr><td class="lbl">Prazo de feedback</td><td>${v('dg_prazo_feedback')} dias úteis</td></tr>
+        </table>
+        <p style="margin-top:8px;font-size:11px"><strong>Entregas:</strong> ${v('dg_entregas')}</p>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Cláusulas Contratuais</div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Pagamento</div>
+          <div class="pdf-clause-body">Valor total: <strong>${v('dg_valor')}</strong> | Sinal (50%): ${v('dg_sinal')} | Final (50%): ${v('dg_final')}<br>Forma: ${v('dg_forma')} | Dados: ${v('dg_dados')}<br>Arquivos editáveis entregues somente após quitação integral.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Direitos Autorais</div>
+          <div class="pdf-clause-body">Após quitação integral, os direitos patrimoniais são transferidos ao CONTRATANTE. O designer mantém o direito moral de autoria e de exibir o trabalho em portfólio.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Foro</div>
+          <div class="pdf-clause-body">Comarca de ${v('dg_cidade')}.</div>
+        </div>
+      </div>
+      <div class="pdf-sigs">
+        <div class="pdf-sig"><div class="pdf-sig-role">Contratante</div><div class="pdf-sig-name">${v('dc_nome')}</div></div>
+        <div class="pdf-sig"><div class="pdf-sig-role">Designer / Estúdio</div><div class="pdf-sig-name">${v('ds_nome')}</div></div>
+      </div>
+    `,
+
+    influencer: () => `
+      <div class="pdf-header">
+        <div class="pdf-tipo">Contrato · Influencer Marketing</div>
+        <div class="pdf-title">Contrato de Influencer Marketing / Publipost</div>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Qualificação das Partes</div>
+        <p style="font-size:11px;color:#5C5448;margin-bottom:8px;font-weight:600">MARCA / EMPRESA:</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Razão Social</td><td>${v('mk_nome')}</td></tr>
+          <tr><td class="lbl">CNPJ / CPF</td><td>${v('mk_cnpj')}</td></tr>
+          <tr><td class="lbl">Representante</td><td>${v('mk_rep')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('mk_email')}</td></tr>
+        </table>
+        <p style="font-size:11px;color:#5C5448;margin:12px 0 8px;font-weight:600">INFLUENCIADOR(A):</p>
+        <table class="pdf-table">
+          <tr><td class="lbl">Nome / @</td><td>${v('inf_nome')}</td></tr>
+          <tr><td class="lbl">CPF / CNPJ</td><td>${v('inf_cpf')}</td></tr>
+          <tr><td class="lbl">E-mail</td><td>${v('inf_email')}</td></tr>
+          <tr><td class="lbl">Perfis</td><td>${v('inf_arrobas')}</td></tr>
+          <tr><td class="lbl">Seguidores</td><td>${v('inf_seguidores')}</td></tr>
+        </table>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Campanha</div>
+        <table class="pdf-table">
+          <tr><td class="lbl">Produto / Serviço</td><td>${v('cp_produto')}</td></tr>
+          <tr><td class="lbl">Plataforma(s)</td><td>${v('cp_plataforma')}</td></tr>
+          <tr><td class="lbl">Formatos</td><td>${v('cp_formatos')}</td></tr>
+          <tr><td class="lbl">Qtd. publicações</td><td>${v('cp_qtd')}</td></tr>
+          <tr><td class="lbl">Período</td><td>${v('cp_inicio')} a ${v('cp_fim')}</td></tr>
+        </table>
+      </div>
+      <div class="pdf-sec">
+        <div class="pdf-sec-title">Cláusulas Contratuais</div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Conteúdo e Marcações CONAR</div>
+          <div class="pdf-clause-body">Todo conteúdo deve identificar o caráter publicitário com #publi, #parceria ou #ad. @Menção obrigatória: ${v('cn_mencao')}. ${data.cn_link ? 'Link/código: ' + data.cn_link : ''}<br>Envio para aprovação: ${v('cn_prazo_envio')} dias úteis antes. Prazo de aprovação da marca: ${v('cn_prazo_aprov')} dias úteis. Máx. rodadas de ajuste: ${v('cn_rodadas')}.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Pagamento</div>
+          <div class="pdf-clause-body">Valor total: <strong>${v('inf_valor')}</strong> | Forma: ${v('inf_forma')} | Data: ${v('inf_data_pag')}<br>${data.inf_produtos ? 'Produtos/brindes: ' + data.inf_produtos : ''}<br>Relatório de métricas em até ${v('inf_prazo_rel')} dias após encerramento.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Não-Concorrência</div>
+          <div class="pdf-clause-body">Por ${v('cn_excl_prazo')} dias após a campanha, o influencer não divulgará concorrentes na categoria: ${v('cn_excl_cat')}.</div>
+        </div>
+        <div class="pdf-clause">
+          <div class="pdf-clause-title">Foro</div>
+          <div class="pdf-clause-body">Comarca de ${v('inf_cidade')}.</div>
+        </div>
+      </div>
+      <div class="pdf-sigs">
+        <div class="pdf-sig"><div class="pdf-sig-role">Marca / Empresa</div><div class="pdf-sig-name">${v('mk_nome')}</div></div>
+        <div class="pdf-sig"><div class="pdf-sig-role">Influenciador(a)</div><div class="pdf-sig-name">${v('inf_nome')}</div></div>
+      </div>
+    `,
+  };
+
+  return templates[tipo] ? templates[tipo]() : '';
+}
+
+// ─── COMPONENTS ───────────────────────────────────────────────────────────────
+
+function Field({ def, value, onChange }) {
+  const id = `f_${def.key}`;
+  if (def.type === 'select') {
+    return (
+      <div className={`field${def.full ? ' full' : ''}`}>
+        <label htmlFor={id}>{def.label}{def.req && <span className="req"> *</span>}</label>
+        <select id={id} value={value || ''} onChange={e => onChange(def.key, e.target.value)}>
+          <option value="">Selecione...</option>
+          {def.options.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      </div>
+    );
+  }
+  if (def.type === 'textarea') {
+    return (
+      <div className={`field${def.full ? ' full' : ''}`}>
+        <label htmlFor={id}>{def.label}{def.req && <span className="req"> *</span>}</label>
+        <textarea id={id} placeholder={def.placeholder} value={value || ''} onChange={e => onChange(def.key, e.target.value)} />
+        {def.hint && <div className="field-hint">{def.hint}</div>}
+      </div>
+    );
+  }
+  return (
+    <div className={`field${def.full ? ' full' : ''}`}>
+      <label htmlFor={id}>{def.label}{def.req && <span className="req"> *</span>}</label>
+      <input id={id} type={def.type} placeholder={def.placeholder} value={value || ''} onChange={e => onChange(def.key, e.target.value)} />
+    </div>
+  );
+}
+
+function FormStep({ fieldGroup, fields, data, onChange, title, subtitle }) {
+  if (!fieldGroup || !fields) return null;
+  return (
+    <div className="form-card">
+      <div className="form-section-title">{title}</div>
+      <div className="form-section-sub">{subtitle}</div>
+      <div className="field-grid">
+        {fields.map(f => (
+          <Field key={f.key} def={f} value={data[f.key]} onChange={onChange} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PreviewStep({ tipo, data }) {
+  const tipoLabel = TIPOS.find(t => t.id === tipo)?.label || '';
+  const val = (key, fb = '—') => data[key] || fb;
+
+  return (
+    <div className="preview-card">
+      <div className="preview-header">
+        <div className="preview-tipo">{tipoLabel}</div>
+        <div className="preview-title">Pré-visualização do Contrato</div>
+      </div>
+      <div style={{fontSize:13,color:'var(--ink3)',marginBottom:24,padding:'12px 16px',background:'var(--bg)',borderRadius:3,borderLeft:'3px solid var(--accent2)'}}>
+        Verifique os dados antes de baixar o PDF. Campos em branco aparecerão como "—" no documento.
+      </div>
+
+      {tipo === 'servicos' && <>
+        <div className="preview-section">
+          <div className="preview-section-title">Contratante</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Nome</div><div className="preview-cell-value">{val('cont_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">CPF/CNPJ</div><div className="preview-cell-value">{val('cont_cpf')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">E-mail</div><div className="preview-cell-value">{val('cont_email')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Telefone</div><div className="preview-cell-value">{val('cont_telefone')}</div></div>
+          </div>
+        </div>
+        <div className="preview-section">
+          <div className="preview-section-title">Contratado(a)</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Nome</div><div className="preview-cell-value">{val('tado_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">CPF/CNPJ</div><div className="preview-cell-value">{val('tado_cpf')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">E-mail</div><div className="preview-cell-value">{val('tado_email')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Telefone</div><div className="preview-cell-value">{val('tado_telefone')}</div></div>
+          </div>
+        </div>
+        <div className="preview-section">
+          <div className="preview-section-title">Escopo e Financeiro</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Modalidade</div><div className="preview-cell-value">{val('modalidade')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Valor total</div><div className="preview-cell-value">{val('valor_total')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Início</div><div className="preview-cell-value">{val('data_inicio')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Conclusão</div><div className="preview-cell-value">{val('data_fim')}</div></div>
+            <div className="preview-cell" style={{gridColumn:'1/-1'}}><div className="preview-cell-label">Descrição do serviço</div><div className="preview-cell-value">{val('descricao')}</div></div>
+          </div>
+        </div>
+      </>}
+
+      {tipo === 'software' && <>
+        <div className="preview-section">
+          <div className="preview-section-title">Projeto</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Nome</div><div className="preview-cell-value">{val('proj_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Tipo</div><div className="preview-cell-value">{val('proj_tipo')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Cliente</div><div className="preview-cell-value">{val('cli_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Desenvolvedor</div><div className="preview-cell-value">{val('dev_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Valor Total</div><div className="preview-cell-value">{val('sw_valor_total')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Entrada</div><div className="preview-cell-value">{val('sw_valor_entrada')}</div></div>
+          </div>
+        </div>
+        <div className="preview-section">
+          <div className="preview-section-title">Milestones</div>
+          {['1','2','3'].map(n => data[`ms${n}_fase`] && (
+            <div key={n} className="preview-grid" style={{marginBottom:8}}>
+              <div className="preview-cell"><div className="preview-cell-label">Fase {n}</div><div className="preview-cell-value">{data[`ms${n}_fase`]}</div></div>
+              <div className="preview-cell"><div className="preview-cell-label">Valor</div><div className="preview-cell-value">{val(`ms${n}_valor`)}</div></div>
+            </div>
+          ))}
+        </div>
+      </>}
+
+      {tipo === 'design' && <>
+        <div className="preview-section">
+          <div className="preview-section-title">Partes e Projeto</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Cliente</div><div className="preview-cell-value">{val('dc_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Designer</div><div className="preview-cell-value">{val('ds_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Tipo</div><div className="preview-cell-value">{val('dg_tipo')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Valor total</div><div className="preview-cell-value">{val('dg_valor')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Revisões</div><div className="preview-cell-value">{val('dg_revisoes')} rodadas</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Versões</div><div className="preview-cell-value">{val('dg_versoes')} versões</div></div>
+          </div>
+        </div>
+      </>}
+
+      {tipo === 'influencer' && <>
+        <div className="preview-section">
+          <div className="preview-section-title">Parceria</div>
+          <div className="preview-grid">
+            <div className="preview-cell"><div className="preview-cell-label">Marca</div><div className="preview-cell-value">{val('mk_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Influencer</div><div className="preview-cell-value">{val('inf_nome')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Produto</div><div className="preview-cell-value">{val('cp_produto')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Plataforma</div><div className="preview-cell-value">{val('cp_plataforma')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Valor</div><div className="preview-cell-value">{val('inf_valor')}</div></div>
+            <div className="preview-cell"><div className="preview-cell-label">Publicações</div><div className="preview-cell-value">{val('cp_qtd')}</div></div>
+          </div>
+        </div>
+      </>}
+
+      <div className="sig-row">
+        <div className="sig-block">
+          <div className="sig-role">Contratante / Cliente / Marca</div>
+          <div className="sig-name">{data[Object.keys(data).find(k => k.includes('cont_nome') || k.includes('cli_nome') || k.includes('dc_nome') || k.includes('mk_nome'))] || '—'}</div>
+        </div>
+        <div className="sig-block">
+          <div className="sig-role">Contratado / Prestador</div>
+          <div className="sig-name">{data[Object.keys(data).find(k => k.includes('tado_nome') || k.includes('dev_nome') || k.includes('ds_nome') || k.includes('inf_nome'))] || '—'}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ──────────────────────────────────────────────────────────────────
+
+function App() {
+  const [tipo, setTipo] = useState('servicos');
+  const [step, setStep] = useState(0);
+  const [data, setData] = useState({});
+  const [generating, setGenerating] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const steps = STEPS[tipo];
+  const fieldMap = STEP_FIELD_MAP[tipo];
+  const fields = FIELDS[tipo];
+
+  const handleChange = useCallback((key, value) => {
+    setData(d => ({ ...d, [key]: value }));
+  }, []);
+
+  const handleTipoChange = (newTipo) => {
+    setTipo(newTipo);
+    setStep(0);
+    setData({});
+  };
+
+  const isPreview = step === steps.length - 1;
+  const progress = Math.round((step / (steps.length - 1)) * 100);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleDownload = () => {
+    setGenerating(true);
+    const target = document.getElementById('pdf-target');
+    target.innerHTML = buildPdfContent(tipo, data);
+
+    const tipoLabel = TIPOS.find(t => t.id === tipo)?.label || 'Contrato';
+    const hoje = new Date().toLocaleDateString('pt-BR');
+
+    const opt = {
+      margin: [12, 10, 12, 10],
+      filename: `Contrato_${tipoLabel.replace(/ /g,'_')}_${hoje.replace(/\//g,'-')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css'] }
+    };
+
+    html2pdf().set(opt).from(target).save().then(() => {
+      target.innerHTML = '';
+      setGenerating(false);
+      showToast('✓ PDF baixado com sucesso!');
+    }).catch(() => {
+      setGenerating(false);
+      showToast('Erro ao gerar PDF. Tente novamente.');
+    });
+  };
+
+  const currentFieldGroup = fieldMap[step];
+  const currentFields = currentFieldGroup && fields[currentFieldGroup];
+  const stepTitles = STEP_TITLES[currentFieldGroup] || ['', ''];
+
+  return (
+    <div className="app">
+      {/* SIDEBAR */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">Contra<span>to</span><br/>Freelancer</div>
+        <div className="sidebar-sub">Gerador de contratos</div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-label">Tipo de contrato</div>
+          {TIPOS.map(t => (
+            <button key={t.id} className={`type-btn${tipo === t.id ? ' active' : ''}`} onClick={() => handleTipoChange(t.id)}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="sidebar-section">
+          <div className="sidebar-section-label">Progresso</div>
+          <div className="step-list">
+            {steps.map((s, i) => (
+              <div key={i} className={`step-item${i === step ? ' active' : i < step ? ' done' : ''}`}>
+                <div className="step-dot">{i < step ? '✓' : i + 1}</div>
+                {s}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="sidebar-footer">
+          Campos marcados com * são<br/>obrigatórios para o PDF.
+        </div>
+      </aside>
+
+      {/* MAIN CONTENT */}
+      <main className="main">
+        <div className="progress-bar">
+          <div className="progress-fill" style={{ width: `${progress}%` }} />
+        </div>
+
+        {step === 0 && (
+          <div>
+            <div className="page-header">
+              <div className="page-title">Escolha o tipo de <em>contrato</em></div>
+              <div className="page-desc">Selecione o modelo que melhor descreve o serviço que você vai prestar.</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              {TIPOS.map(t => (
+                <div key={t.id}
+                  onClick={() => { setTipo(t.id); setStep(1); }}
+                  style={{
+                    background: tipo === t.id ? 'var(--ink)' : 'var(--surface)',
+                    color: tipo === t.id ? '#F7F5F0' : 'var(--ink)',
+                    border: `1.5px solid ${tipo === t.id ? 'var(--ink)' : 'var(--border)'}`,
+                    borderRadius: 6, padding: '28px 24px', cursor: 'pointer',
+                    transition: 'all .15s'
+                  }}>
+                  <div style={{ fontSize: 28, marginBottom: 12 }}>{t.icon}</div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, marginBottom: 6 }}>{t.label}</div>
+                  <div style={{ fontSize: 13, opacity: .6 }}>
+                    {t.id === 'servicos' && 'Qualquer prestação de serviço autônoma'}
+                    {t.id === 'software' && 'Dev web, apps, sistemas e APIs'}
+                    {t.id === 'design' && 'Identidade visual, UI/UX, social media'}
+                    {t.id === 'influencer' && 'Publipost, parceria e campanhas pagas'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {step > 0 && !isPreview && (
+          <div>
+            <div className="page-header">
+              <div className="page-title">{stepTitles[0]}</div>
+              <div className="page-desc">{stepTitles[1]}</div>
+            </div>
+            <FormStep
+              fieldGroup={currentFieldGroup}
+              fields={currentFields}
+              data={data}
+              onChange={handleChange}
+              title={stepTitles[0]}
+              subtitle={stepTitles[1]}
+            />
+          </div>
+        )}
+
+        {isPreview && (
+          <div>
+            <div className="page-header">
+              <div className="page-title">Revise e <em>baixe</em></div>
+              <div className="page-desc">Confirme os dados antes de gerar o PDF profissional.</div>
+            </div>
+            <PreviewStep tipo={tipo} data={data} />
+          </div>
+        )}
+
+        {/* NAVIGATION */}
+        <div className="step-nav">
+          <button className="btn btn-ghost" onClick={() => setStep(s => Math.max(0, s - 1))} style={{ visibility: step === 0 ? 'hidden' : 'visible' }}>
+            ← Voltar
+          </button>
+
+          {!isPreview ? (
+            <button className="btn btn-primary" onClick={() => setStep(s => s + 1)}>
+              {step === 0 ? 'Começar →' : 'Próximo →'}
+            </button>
+          ) : (
+            <button className="btn btn-download" onClick={handleDownload} disabled={generating}>
+              {generating ? 'Gerando PDF...' : '↓ Baixar contrato em PDF'}
+            </button>
+          )}
+        </div>
+      </main>
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
