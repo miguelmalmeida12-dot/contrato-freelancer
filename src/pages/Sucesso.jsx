@@ -16,6 +16,9 @@ export default function Sucesso() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
       <div style={{ maxWidth: 480, textAlign: 'center' }}>
+        <div style={{ fontSize: 32, fontFamily: 'var(--font-display)', color: 'var(--ink)', marginBottom: 8 }}>
+          TR<span style={{ color: 'var(--accent)' }}>A</span>CT
+        </div>
         <div style={{ fontSize: 64, marginBottom: 24 }}>🎉</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 36, color: 'var(--ink)', marginBottom: 12 }}>
           Pagamento aprovado!

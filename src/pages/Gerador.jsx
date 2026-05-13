@@ -556,29 +556,48 @@ export default function Gerador() {
     try {
       const html2pdf = (await import('html2pdf.js')).default
 
-      // Cria elemento temporário
-      const wrapper = document.createElement('div')
-      wrapper.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:#fff'
-      wrapper.innerHTML = buildPdfHtml(tipo, data, clausulas)
-      document.body.appendChild(wrapper)
-
       const tipoLabel = TIPOS.find(t => t.id === tipo)?.label || 'Contrato'
       const hoje = new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')
+      const filename = `TRACT_${tipoLabel.replace(/ /g, '_')}_${hoje}.pdf`
+
+      // ─── FIX DO PDF EM BRANCO ───────────────────────────────────────────────
+      // html2pdf falha quando o elemento está fora da viewport (left:-9999px).
+      // Solução: renderizar dentro de um iframe invisível no fluxo normal da página.
+      const iframe = document.createElement('iframe')
+      iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1px;opacity:0;pointer-events:none;border:none;'
+      document.body.appendChild(iframe)
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document
+      iframeDoc.open()
+      iframeDoc.write(buildPdfHtml(tipo, data, clausulas))
+      iframeDoc.close()
+
+      // Aguarda o iframe renderizar completamente
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const target = iframeDoc.body
 
       await html2pdf().set({
-        margin: [14, 12, 14, 12],
-        filename: `Contrato_${tipoLabel.replace(/ /g, '_')}_${hoje}.pdf`,
+        margin: [12, 10, 12, 10],
+        filename,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          windowWidth: 794,
+          scrollX: 0,
+          scrollY: 0,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css'] },
-      }).from(wrapper).save()
+        pagebreak: { mode: ['css', 'legacy'] },
+      }).from(target).save()
 
-      document.body.removeChild(wrapper)
+      document.body.removeChild(iframe)
       showToast('✓ PDF baixado com sucesso!')
     } catch (e) {
-      console.error(e)
-      showToast('Erro ao gerar PDF', false)
+      console.error('[PDF] erro:', e)
+      showToast('Erro ao gerar PDF. Tente novamente.', false)
     } finally {
       setGenerating(false)
     }
@@ -592,7 +611,13 @@ export default function Gerador() {
     <div style={S.app}>
       {/* SIDEBAR */}
       <aside style={S.sidebar}>
-        <div style={S.sidebarLogo}>Contrato<span style={{ color:'var(--accent)' }}>Freelancer</span></div>
+        <div
+          style={{ ...S.sidebarLogo, cursor:'pointer' }}
+          onClick={() => navigate('/')}
+          title="Voltar à página inicial"
+        >
+          TR<span style={{ color:'var(--accent2)' }}>A</span>CT
+        </div>
         <div style={S.sidebarSub}>Gerador com IA</div>
 
         <div style={{ marginBottom:36 }}>
@@ -618,7 +643,7 @@ export default function Gerador() {
         </div>
 
         <div style={{ marginTop:'auto', fontSize:11, color:'#3A3530', lineHeight:1.7 }}>
-          <button onClick={() => navigate('/')} style={{ background:'none', border:'none', color:'#5C5448', fontSize:11, cursor:'pointer', padding:0 }}>← Voltar à landing</button>
+          Clique no logo para voltar à página inicial.
         </div>
       </aside>
 
