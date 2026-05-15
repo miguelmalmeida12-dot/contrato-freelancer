@@ -48,7 +48,7 @@ function LoginModal({ onClose }) {
       if (planoAtivo && (emailSalvo === email || !emailSalvo)) {
         localStorage.setItem('plano_email', email)
         onClose()
-        navigate('/app')
+        navigate('/perfil')
       } else {
         setErro('Assinatura não encontrada para este e-mail. Verifique ou adquira um plano abaixo.')
         setLoading(false)

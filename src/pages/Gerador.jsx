@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useContratos } from '../hooks/useContratos.js'
 
 // ─── DADOS E CONFIGURAÇÃO ─────────────────────────────────────────────────────
 
@@ -354,141 +355,657 @@ function PainelClausulas({ clausulas, alertas, sugestoes, loading, onGerar, temD
   )
 }
 
-// ─── PDF BUILDER ──────────────────────────────────────────────────────────────
+// ─── PDF BUILDER — VERSÃO JURÍDICA COMPLETA ───────────────────────────────────
 
 function buildPdfHtml(tipo, data, clausulasIA) {
-  const v = (key) => data[key] || '___________'
-  const tipoLabels = { servicos:'Prestação de Serviços', software:'Desenvolvimento de Software', design:'Design e Criação', influencer:'Influencer Marketing' }
+  const v = (key, fb = '___________') => (data[key] && String(data[key]).trim()) ? data[key] : fb
+  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+
+  // Cláusulas IA ou padrão
+  const IA = clausulasIA || {}
+  const aiBadge = clausulasIA ? ' <span style="font-size:7pt;color:#1D4ED8;background:#EFF6FF;padding:1px 5px;border-radius:2px;font-weight:600;vertical-align:middle">IA</span>' : ''
 
   const css = `
-    body { font-family: Arial, sans-serif; font-size: 11pt; color: #1A1612; line-height: 1.7; margin: 0; padding: 0; }
-    .header { border-bottom: 3px solid #1A1612; padding-bottom: 16px; margin-bottom: 24px; }
-    .tipo { font-size: 9pt; text-transform: uppercase; letter-spacing: .1em; color: #C8502A; margin-bottom: 6px; }
-    .title { font-size: 22pt; font-weight: 700; }
-    .sec-title { font-size: 9pt; text-transform: uppercase; letter-spacing: .08em; background: #F7F5F0; padding: 5px 10px; color: #5C5448; font-weight: 700; border-left: 3px solid #C8502A; margin: 20px 0 10px; }
-    .clause { margin-bottom: 16px; page-break-inside: avoid; }
-    .clause-title { font-size: 11pt; font-weight: 700; color: #1A1612; margin-bottom: 6px; border-bottom: 1px solid #E2DDD6; padding-bottom: 4px; }
-    .clause-body { font-size: 10pt; color: #3A3530; line-height: 1.8; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10pt; }
-    th { background: #1A1612; color: #fff; padding: 6px 10px; text-align: left; }
-    td { padding: 6px 10px; border-bottom: 1px solid #E2DDD6; }
-    tr:nth-child(even) td { background: #F7F5F0; }
-    .lbl { font-weight: 600; color: #5C5448; width: 38%; }
-    .sigs { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 48px; }
-    .sig { border-top: 1.5px solid #1A1612; padding-top: 10px; }
-    .sig-role { font-size: 9pt; text-transform: uppercase; letter-spacing: .06em; color: #A09890; }
-    .sig-name { font-size: 11pt; font-weight: 600; margin-top: 4px; }
-    .ai-badge { font-size: 8pt; color: #1D4ED8; background: #EFF6FF; padding: 2px 6px; border-radius: 2px; margin-left: 6px; }
+    @page { margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Times New Roman', Times, serif;
+      font-size: 11pt;
+      color: #1A1612;
+      line-height: 1.8;
+      margin: 0;
+      padding: 28mm 22mm 24mm 28mm;
+      background: #fff;
+    }
+    /* CABEÇALHO */
+    .doc-header {
+      text-align: center;
+      margin-bottom: 28px;
+      padding-bottom: 18px;
+      border-bottom: 2px solid #1A1612;
+    }
+    .doc-marca {
+      font-family: Arial, sans-serif;
+      font-size: 10pt;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: #C8502A;
+      margin-bottom: 10px;
+    }
+    .doc-title {
+      font-size: 16pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #1A1612;
+      margin: 0 0 4px;
+    }
+    .doc-subtitle {
+      font-size: 9pt;
+      color: #6B6358;
+      letter-spacing: .04em;
+    }
+    /* PREÂMBULO */
+    .preambulo {
+      background: #F7F5F0;
+      border-left: 3px solid #C8502A;
+      padding: 12px 16px;
+      font-size: 10pt;
+      line-height: 1.7;
+      margin-bottom: 24px;
+      color: #3A3530;
+    }
+    /* PARTES */
+    .partes-title {
+      font-size: 10pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #1A1612;
+      margin: 20px 0 8px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid #CEC8BF;
+    }
+    .parte-bloco {
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      border: 1px solid #E2DDD6;
+      border-radius: 2px;
+    }
+    .parte-bloco p {
+      margin: 3px 0;
+      font-size: 10.5pt;
+    }
+    .parte-label {
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #C8502A;
+      display: block;
+      margin-bottom: 6px;
+    }
+    /* SEÇÃO */
+    .sec-title {
+      font-size: 9pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: #fff;
+      background: #2C3E50;
+      padding: 6px 12px;
+      margin: 28px 0 14px;
+    }
+    /* CLÁUSULAS */
+    .clause {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+    .clause-title {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #1A1612;
+      margin-bottom: 6px;
+      font-family: Arial, sans-serif;
+    }
+    .clause-body {
+      font-size: 10.5pt;
+      color: #2C2820;
+      line-height: 1.85;
+      text-align: justify;
+    }
+    .clause-body p { margin: 0 0 8px; }
+    .clause-body .par {
+      margin: 6px 0 6px 20px;
+      font-size: 10pt;
+    }
+    /* TABELA DE MARCOS */
+    .milestone-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+      margin: 10px 0 14px;
+    }
+    .milestone-table th {
+      background: #2C3E50;
+      color: #fff;
+      padding: 6px 10px;
+      text-align: left;
+      font-family: Arial, sans-serif;
+      font-size: 8.5pt;
+      letter-spacing: .04em;
+    }
+    .milestone-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #E2DDD6;
+    }
+    .milestone-table tr:nth-child(even) td { background: #F7F5F0; }
+    /* FECHO */
+    .fecho {
+      margin-top: 28px;
+      font-size: 10.5pt;
+      color: #2C2820;
+      text-align: justify;
+      line-height: 1.8;
+    }
+    /* ASSINATURAS */
+    .sig-section { margin-top: 48px; page-break-inside: avoid; }
+    .sig-local { font-size: 10pt; color: #6B6358; margin-bottom: 36px; }
+    .sig-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 32px;
+    }
+    .sig-box { }
+    .sig-line {
+      border-top: 1.5px solid #1A1612;
+      padding-top: 10px;
+      margin-top: 48px;
+    }
+    .sig-name { font-size: 10.5pt; font-weight: 700; margin-bottom: 2px; }
+    .sig-detail { font-size: 9pt; color: #6B6358; line-height: 1.6; }
+    .sig-label { font-size: 8pt; text-transform: uppercase; letter-spacing: .08em; color: #C8502A; font-family: Arial, sans-serif; font-weight: 700; margin-bottom: 4px; }
+    .testemunhas {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px dashed #CEC8BF;
+    }
+    .test-title { font-size: 8.5pt; text-transform: uppercase; letter-spacing: .08em; color: #6B6358; margin-bottom: 20px; font-family: Arial, sans-serif; }
+    .test-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+    .test-box .sig-line { margin-top: 36px; }
+    /* RODAPÉ */
+    .doc-footer {
+      margin-top: 32px;
+      padding-top: 10px;
+      border-top: 1px solid #E2DDD6;
+      font-size: 8pt;
+      color: #A09890;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
   `
 
-  // Seleciona cláusulas (IA ou padrão)
-  const obj = clausulasIA?.clausula_objeto
-  const obrig_tado = clausulasIA?.clausula_obrigacoes_contratado
-  const obrig_tante = clausulasIA?.clausula_obrigacoes_contratante
-  const pi = clausulasIA?.clausula_propriedade_intelectual
-  const rescisao = clausulasIA?.clausula_rescisao
-
-  const aiBadge = clausulasIA ? '<span class="ai-badge">✨ IA</span>' : ''
-
-  const partesServicos = `
-    <p style="font-size:10pt;font-weight:700;margin:0 0 6px">CONTRATANTE:</p>
-    <table><tr><td class="lbl">Nome</td><td>${v('cont_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('cont_cpf')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('cont_email')}</td></tr><tr><td class="lbl">Telefone</td><td>${v('cont_telefone')}</td></tr><tr><td class="lbl">Endereço</td><td>${v('cont_endereco')}</td></tr></table>
-    <p style="font-size:10pt;font-weight:700;margin:12px 0 6px">CONTRATADO(A):</p>
-    <table><tr><td class="lbl">Nome</td><td>${v('tado_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('tado_cpf')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('tado_email')}</td></tr></table>
+  // ─── BLOCO DE ASSINATURAS REUTILIZÁVEL ────────────────────────────────────
+  const sigBlock = (parte1, parte2) => `
+    <div class="sig-section">
+      <div class="fecho">
+        <p>E por estarem assim justas e acordadas, as partes assinam o presente instrumento em duas vias de igual teor e forma, juntamente com as testemunhas abaixo, para que produza os devidos efeitos legais.</p>
+      </div>
+      <div class="sig-local">${v('cidade_foro', v('sw_cidade_foro', v('dg_cidade', v('inf_cidade', '_____________'))))}, ${hoje}</div>
+      <div class="sig-grid">
+        <div class="sig-box">
+          <div class="sig-line">
+            <div class="sig-label">Contratante / ${parte1.role}</div>
+            <div class="sig-name">${parte1.nome}</div>
+            <div class="sig-detail">CPF/CNPJ: ${parte1.doc}</div>
+            ${parte1.extra || ''}
+          </div>
+        </div>
+        <div class="sig-box">
+          <div class="sig-line">
+            <div class="sig-label">Contratado(a) / ${parte2.role}</div>
+            <div class="sig-name">${parte2.nome}</div>
+            <div class="sig-detail">CPF/CNPJ: ${parte2.doc}</div>
+            ${parte2.extra || ''}
+          </div>
+        </div>
+      </div>
+      <div class="testemunhas">
+        <div class="test-title">Testemunhas (facultativo, recomendado para maior validade probatória)</div>
+        <div class="test-grid">
+          <div class="test-box">
+            <div class="sig-line">
+              <div class="sig-detail">Nome: ________________________________________</div>
+              <div class="sig-detail">CPF: _______________________</div>
+            </div>
+          </div>
+          <div class="test-box">
+            <div class="sig-line">
+              <div class="sig-detail">Nome: ________________________________________</div>
+              <div class="sig-detail">CPF: _______________________</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="doc-footer">Documento gerado por TRACT · ${hoje} · Este contrato é regido pela legislação brasileira, em especial pelo Código Civil (Lei nº 10.406/2002) e demais normas aplicáveis.</div>
   `
 
-  const clausulasServicos = `
-    <div class="clause"><div class="clause-title">Cláusula 1ª – Do Objeto ${aiBadge}</div><div class="clause-body">${obj || `O presente contrato tem por objeto a prestação dos seguintes serviços: ${v('descricao')}. Modalidade: ${v('modalidade')}.`}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 2ª – Do Prazo</div><div class="clause-body">Início: ${v('data_inicio')} | Conclusão prevista: ${v('data_fim')}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 3ª – Do Valor e Pagamento</div><div class="clause-body">Valor total: <strong>${v('valor_total')}</strong> | Forma: ${v('forma_pagamento')} | Vencimento: ${v('data_vencimento')}<br>Dados: ${v('dados_bancarios')} | Primeiro pagamento: ${v('data_primeiro_pag')}<br>Multa por atraso: 2% + juros de 1% a.m.</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 4ª – Das Obrigações do Contratado ${aiBadge}</div><div class="clause-body">${obrig_tado || `Executar os serviços com qualidade. Revisões incluídas: ${v('num_revisoes')}. Formatos: ${v('formatos_entrega')}. Manter sigilo das informações do contratante.`}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 5ª – Das Obrigações do Contratante ${aiBadge}</div><div class="clause-body">${obrig_tante || `Pagar nas datas acordadas. Fornecer materiais em até ${v('prazo_retorno')} dias. Aprovar entregas em até ${v('prazo_aprovacao')} dias úteis.`}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 6ª – Da Propriedade Intelectual ${aiBadge}</div><div class="clause-body">${pi || 'Os direitos patrimoniais são transferidos ao CONTRATANTE após quitação integral. O CONTRATADO mantém o direito de uso em portfólio.'}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 7ª – Da Rescisão ${aiBadge}</div><div class="clause-body">${rescisao || `Rescisão mediante aviso de ${v('prazo_aviso')} dias. Multa de ${v('multa_rescisao')}% sobre o total.`}</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 8ª – Da Relação entre as Partes</div><div class="clause-body">Não há vínculo empregatício. O CONTRATADO é autônomo e responsável pelos próprios tributos (Art. 593, CC).</div></div>
-    <div class="clause"><div class="clause-title">Cláusula 9ª – Do Foro</div><div class="clause-body">Foro eleito: comarca de ${v('cidade_foro')}.</div></div>
+  // ─── TEMPLATE: PRESTAÇÃO DE SERVIÇOS ──────────────────────────────────────
+  const tmplServicos = () => `
+    <div class="doc-header">
+      <div class="doc-marca">TRACT · Gerador de Contratos</div>
+      <div class="doc-title">Contrato de Prestação de Serviços</div>
+      <div class="doc-subtitle">Instrumento Particular de Prestação de Serviços Autônomos</div>
+    </div>
+
+    <div class="preambulo">
+      Pelo presente instrumento particular, as partes abaixo qualificadas celebram o presente Contrato de Prestação de Serviços, que se regerá pelas cláusulas e condições seguintes, em conformidade com os artigos 593 a 609 do Código Civil Brasileiro (Lei nº 10.406/2002).
+    </div>
+
+    <div class="sec-title">I — Qualificação das Partes</div>
+
+    <div class="partes-title">Contratante</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Quem contrata o serviço</span>
+      <p><strong>Nome / Razão Social:</strong> ${v('cont_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('cont_cpf')}</p>
+      <p><strong>Endereço:</strong> ${v('cont_endereco')}</p>
+      <p><strong>E-mail:</strong> ${v('cont_email')} &nbsp;&nbsp; <strong>Telefone:</strong> ${v('cont_telefone')}</p>
+    </div>
+
+    <div class="partes-title">Contratado(a)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Prestador do serviço</span>
+      <p><strong>Nome / Razão Social:</strong> ${v('tado_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('tado_cpf')}</p>
+      <p><strong>Endereço:</strong> ${v('tado_endereco')}</p>
+      <p><strong>E-mail:</strong> ${v('tado_email')} &nbsp;&nbsp; <strong>Telefone:</strong> ${v('tado_telefone')}</p>
+    </div>
+
+    <div class="sec-title">II — Cláusulas e Condições</div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 1ª – DO OBJETO DO CONTRATO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_objeto || `<p>O presente contrato tem por objeto a prestação, pelo CONTRATADO ao CONTRATANTE, dos seguintes serviços: <strong>${v('descricao')}</strong>.</p><p>Os serviços serão executados na modalidade <strong>${v('modalidade')}</strong>, conforme acordado entre as partes, observando-se os padrões técnicos e de qualidade inerentes à atividade.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 2ª – DO PRAZO DE EXECUÇÃO</div>
+      <div class="clause-body">
+        <p>Os serviços terão início em <strong>${v('data_inicio')}</strong> e deverão ser concluídos até <strong>${v('data_fim')}</strong>, salvo motivo de força maior, caso fortuito ou atraso imputável ao CONTRATANTE no fornecimento de materiais e informações necessários à execução.</p>
+        <p>Estão incluídas no presente contrato <strong>${v('num_revisoes')}</strong> rodadas de revisão sobre as entregas realizadas. Revisões adicionais, caso solicitadas, serão orçadas separadamente e formalizadas por escrito. Os arquivos finais serão entregues nos seguintes formatos: ${v('formatos_entrega')}.</p>
+        ${v('cronograma') !== '___________' ? `<p>O cronograma de entregas parciais acordado é o seguinte: ${v('cronograma')}.</p>` : ''}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 3ª – DO VALOR E DA FORMA DE PAGAMENTO</div>
+      <div class="clause-body">
+        <p>Pela prestação dos serviços ora contratados, o CONTRATANTE pagará ao CONTRATADO o valor total de <strong>${v('valor_total')}</strong>, nas condições a seguir: ${v('data_vencimento')}.</p>
+        <p>O pagamento será realizado mediante <strong>${v('forma_pagamento')}</strong>, utilizando os seguintes dados: ${v('dados_bancarios')}. O primeiro pagamento deverá ocorrer até <strong>${v('data_primeiro_pag')}</strong>, sendo esta condição essencial para o início da execução dos serviços.</p>
+        <p>O inadimplemento de qualquer parcela acarretará a incidência de multa moratória de 2% (dois por cento) sobre o valor em atraso, acrescida de juros de mora de 1% (um por cento) ao mês, calculados pro rata die, sem prejuízo da possibilidade de suspensão dos serviços até regularização do débito, nos termos do art. 476 do Código Civil.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 4ª – DAS OBRIGAÇÕES DO CONTRATADO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_obrigacoes_contratado || `<p>São obrigações do CONTRATADO: (a) executar os serviços descritos na Cláusula 1ª com zelo, diligência e qualidade técnica compatíveis com a atividade profissional; (b) cumprir rigorosamente os prazos estipulados, comunicando imediatamente qualquer impedimento; (c) manter sigilo absoluto sobre todas as informações, dados e documentos do CONTRATANTE obtidos durante a execução do contrato, obrigação esta que persiste após o término do vínculo; (d) não subcontratar total ou parcialmente os serviços sem autorização prévia e escrita do CONTRATANTE; (e) realizar as revisões contratadas e entregar os arquivos nos formatos acordados.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 5ª – DAS OBRIGAÇÕES DO CONTRATANTE${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_obrigacoes_contratante || `<p>São obrigações do CONTRATANTE: (a) efetuar os pagamentos nas datas e condições acordadas; (b) fornecer ao CONTRATADO, no prazo de até <strong>${v('prazo_retorno')}</strong> dias após a solicitação, todos os materiais, informações, acessos e subsídios necessários à execução dos serviços; (c) revisar e aprovar ou solicitar alterações nas entregas parciais em até <strong>${v('prazo_aprovacao')}</strong> dias úteis, sendo que a ausência de manifestação nesse prazo implicará aprovação tácita; (d) abster-se de solicitar serviços fora do escopo contratado sem a formalização de aditivo.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 6ª – DA PROPRIEDADE INTELECTUAL${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_propriedade_intelectual || `<p>Os direitos patrimoniais de autor sobre os trabalhos desenvolvidos especificamente para o CONTRATANTE serão a ele cedidos após a quitação integral de todos os valores contratados, nos termos da Lei nº 9.610/1998. Enquanto houver pendência financeira, o CONTRATADO reserva-se o direito de reter os arquivos definitivos.</p><p>O CONTRATADO mantém o direito moral de autoria, irrenunciável por força de lei, bem como o direito de utilizar os trabalhos realizados em seu portfólio profissional, salvo expressa proibição formalizada em cláusula adicional específica. Ferramentas, metodologias e conhecimentos pré-existentes do CONTRATADO permanecem de sua propriedade exclusiva.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 7ª – DA RESCISÃO CONTRATUAL${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_rescisao || `<p>O presente contrato poderá ser rescindido por qualquer das partes mediante comunicação escrita com antecedência mínima de <strong>${v('prazo_aviso')}</strong> dias. Em caso de rescisão unilateral sem justa causa por parte do CONTRATANTE após o início da execução dos serviços, ficará devida ao CONTRATADO multa equivalente a <strong>${v('multa_rescisao')}%</strong> sobre o valor total do contrato, além do pagamento proporcional pelos serviços já prestados.</p><p>Em caso de rescisão por parte do CONTRATADO sem justa causa, este deverá restituir, proporcionalmente, os valores recebidos referentes a serviços não realizados, descontados os custos já incorridos devidamente comprovados.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 8ª – DA AUSÊNCIA DE VÍNCULO EMPREGATÍCIO</div>
+      <div class="clause-body">
+        <p>O presente contrato não estabelece qualquer relação de emprego ou vínculo empregatício entre as partes, sendo o CONTRATADO profissional autônomo, integralmente responsável pelo recolhimento de seus próprios encargos tributários, previdenciários e fiscais decorrentes da prestação dos serviços aqui contratados, incluindo, mas não se limitando a: ISS, INSS e Imposto de Renda. Não haverá qualquer responsabilidade trabalhista ou previdenciária por parte do CONTRATANTE, nos termos do art. 593 do Código Civil.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 9ª – DAS DISPOSIÇÕES GERAIS E DO FORO</div>
+      <div class="clause-body">
+        <p>O presente instrumento constitui o acordo integral entre as partes sobre o objeto aqui tratado, prevalecendo sobre quaisquer negociações, propostas ou entendimentos anteriores, verbais ou escritos. Eventuais alterações somente produzirão efeitos se formalizadas por escrito e assinadas por ambas as partes.</p>
+        <p>As partes elegem o foro da Comarca de <strong>${v('cidade_foro')}</strong> para dirimir quaisquer dúvidas, litígios ou controvérsias oriundas do presente contrato, renunciando a qualquer outro, por mais privilegiado que seja, nos termos do art. 63 do Código de Processo Civil.</p>
+      </div>
+    </div>
+
+    ${sigBlock(
+      { role: 'Contratante', nome: v('cont_nome'), doc: v('cont_cpf') },
+      { role: 'Prestador de Serviços', nome: v('tado_nome'), doc: v('tado_cpf') }
+    )}
+  `
+
+  // ─── TEMPLATE: DESENVOLVIMENTO DE SOFTWARE ────────────────────────────────
+  const tmplSoftware = () => `
+    <div class="doc-header">
+      <div class="doc-marca">TRACT · Gerador de Contratos</div>
+      <div class="doc-title">Contrato de Desenvolvimento de Software</div>
+      <div class="doc-subtitle">Instrumento Particular de Desenvolvimento e Entrega de Produto Digital</div>
+    </div>
+
+    <div class="preambulo">
+      Pelo presente instrumento particular, as partes abaixo qualificadas celebram o presente Contrato de Desenvolvimento de Software, regido pela Lei nº 10.406/2002 (Código Civil), Lei nº 9.609/1998 (Software) e Lei nº 9.610/1998 (Direitos Autorais), vinculando as partes e seus sucessores.
+    </div>
+
+    <div class="sec-title">I — Qualificação das Partes</div>
+
+    <div class="partes-title">Cliente (Contratante)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Quem contrata o desenvolvimento</span>
+      <p><strong>Nome / Razão Social:</strong> ${v('cli_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('cli_cpf')}</p>
+      <p><strong>Representante Legal:</strong> ${v('cli_rep')}</p>
+      <p><strong>E-mail:</strong> ${v('cli_email')} &nbsp;&nbsp; <strong>Telefone:</strong> ${v('cli_tel')}</p>
+    </div>
+
+    <div class="partes-title">Desenvolvedor(a) / Empresa (Contratado)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Quem executa o desenvolvimento</span>
+      <p><strong>Nome / Razão Social:</strong> ${v('dev_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('dev_cpf')}</p>
+      <p><strong>E-mail:</strong> ${v('dev_email')} &nbsp;&nbsp; <strong>Telefone:</strong> ${v('dev_tel')}</p>
+    </div>
+
+    <div class="sec-title">II — Objeto e Especificações do Projeto</div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 1ª – DO OBJETO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_objeto || `<p>O presente contrato tem por objeto o desenvolvimento do seguinte produto digital: <strong>${v('proj_nome')}</strong>, classificado como <strong>${v('proj_tipo')}</strong>, destinado às plataformas <strong>${v('proj_plataformas')}</strong>, utilizando a stack tecnológica: ${v('proj_stack')}.</p><p>O escopo funcional do projeto compreende: ${v('proj_escopo')}. Qualquer funcionalidade não expressamente descrita acima está fora do escopo e será desenvolvida somente mediante aditivo contratual e pagamento adicional.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 2ª – DAS FASES, ENTREGAS E MARCOS</div>
+      <div class="clause-body">
+        <p>O desenvolvimento será organizado em fases, conforme cronograma abaixo. Cada fase será iniciada após aprovação formal da fase anterior e quitação da parcela correspondente:</p>
+        <table class="milestone-table">
+          <thead><tr><th>Fase</th><th>Entregável</th><th>Prazo</th><th>Valor</th></tr></thead>
+          <tbody>
+            ${['1','2','3'].map(n => data[`ms${n}_fase`] ? `<tr><td><strong>${data[`ms${n}_fase`]}</strong></td><td>${v(`ms${n}_entrega`)}</td><td>${v(`ms${n}_prazo`)}</td><td>${v(`ms${n}_valor`)}</td></tr>` : '').join('')}
+          </tbody>
+        </table>
+        <p>O CONTRATANTE terá acesso a ambiente de homologação (staging) para validação de cada entrega. A aprovação deverá ser formalizada por e-mail em até <strong>${v('sw_prazo_aceite')}</strong> dias úteis. Decorrido esse prazo sem manifestação, a entrega será considerada tacitamente aceita e a próxima fase será iniciada.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 3ª – DO VALOR E FORMA DE PAGAMENTO</div>
+      <div class="clause-body">
+        <p>O valor total contratado é de <strong>${v('sw_valor_total')}</strong>, pago conforme o cronograma de fases acima. A título de sinal, correspondente a <strong>${v('sw_pct_entrada')}%</strong> do valor total (<strong>${v('sw_valor_entrada')}</strong>), deverá ser pago antes do início do desenvolvimento, sendo condição suspensiva para o início dos trabalhos. O pagamento final, equivalente a <strong>${v('sw_pct_final')}%</strong> (<strong>${v('sw_valor_final')}</strong>), será devido na entrega definitiva.</p>
+        <p>Os pagamentos serão realizados por <strong>${v('sw_forma_pag')}</strong>, nos seguintes dados: ${v('sw_dados_banco')}. O atraso superior a 15 (quinze) dias corridos no pagamento de qualquer parcela autoriza o CONTRATADO a suspender o desenvolvimento, sem que isso configure inadimplemento de sua parte, até a regularização do débito acrescido de multa de 2% e juros de 1% ao mês.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 4ª – DO CONTROLE DE MUDANÇAS DE ESCOPO</div>
+      <div class="clause-body">
+        <p>Qualquer alteração no escopo original — incluindo novas funcionalidades, modificações substanciais nas já previstas ou mudanças na stack tecnológica — deverá ser formalizada mediante Pedido de Mudança (Change Request) assinado por ambas as partes, contendo: descrição detalhada da alteração, impacto estimado no prazo de entrega e custo adicional correspondente. Nenhuma alteração de escopo será implementada sem aprovação formal, e o CONTRATADO não poderá ser responsabilizado por atrasos decorrentes de solicitações de mudança não formalizadas.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 5ª – DA PROPRIEDADE INTELECTUAL E LICENCIAMENTO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_propriedade_intelectual || `<p>Após a quitação integral de todos os valores contratados, o CONTRATANTE receberá a cessão plena dos direitos patrimoniais sobre o código-fonte desenvolvido especificamente para este projeto, incluindo documentação técnica e acesso a todos os repositórios, nos termos da Lei nº 9.609/1998.</p><p>Bibliotecas, frameworks, componentes de terceiros e módulos open-source utilizados permanecem sujeitos às suas respectivas licenças, sendo de responsabilidade do CONTRATANTE verificar a adequação dessas licenças ao uso comercial pretendido. O CONTRATADO reserva o direito de reutilizar componentes genéricos e módulos não específicos deste projeto em outros trabalhos.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 6ª – DA GARANTIA TÉCNICA</div>
+      <div class="clause-body">
+        <p>Após o aceite formal da entrega final, o CONTRATADO oferece garantia técnica de <strong>${v('sw_garantia')}</strong> dias para correção, sem custo adicional, de bugs e falhas funcionais identificados nas funcionalidades desenvolvidas conforme o escopo contratado. Não estão cobertos pela garantia: (a) problemas causados por alterações realizadas pelo CONTRATANTE ou terceiros após a entrega; (b) incompatibilidades com atualizações de sistemas, navegadores ou plataformas lançadas após a entrega definitiva; (c) novas funcionalidades solicitadas após o encerramento do contrato.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 7ª – DA CONFIDENCIALIDADE</div>
+      <div class="clause-body">
+        <p>Ambas as partes obrigam-se a manter sigilo absoluto sobre todas as informações confidenciais trocadas durante a execução deste contrato — incluindo dados de negócio, estratégias comerciais, dados de clientes e código-fonte — pelo período de <strong>${v('sw_nda_anos')}</strong> anos após o encerramento do vínculo contratual, sob pena de responsabilização civil e criminal. Esta obrigação persiste independentemente da causa de término do contrato.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 8ª – DA RESCISÃO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_rescisao || `<p>Em caso de rescisão unilateral pelo CONTRATANTE antes da conclusão do projeto, serão devidos ao CONTRATADO todos os valores referentes às fases já concluídas e entregues, acrescidos de indenização de 20% sobre o valor remanescente não executado. Em caso de rescisão pelo CONTRATADO sem justa causa, este deverá restituir os valores pagos relativos a etapas não entregues, descontadas as despesas já incorridas e devidamente comprovadas.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 9ª – DISPOSIÇÕES GERAIS E FORO</div>
+      <div class="clause-body">
+        <p>Custos de infraestrutura, hospedagem, domínios, APIs de terceiros e demais serviços externos necessários à operação em produção não estão incluídos neste contrato e são de responsabilidade exclusiva do CONTRATANTE. As partes elegem o foro da Comarca de <strong>${v('sw_cidade_foro')}</strong> para dirimir eventuais controvérsias, com renúncia a qualquer outro.</p>
+      </div>
+    </div>
+
+    ${sigBlock(
+      { role: 'Cliente', nome: v('cli_nome'), doc: v('cli_cpf'), extra: v('cli_rep') !== '___________' ? `<div class="sig-detail">Representante: ${v('cli_rep')}</div>` : '' },
+      { role: 'Desenvolvedor(a)', nome: v('dev_nome'), doc: v('dev_cpf') }
+    )}
+  `
+
+  // ─── TEMPLATE: DESIGN / CRIATIVO ──────────────────────────────────────────
+  const tmplDesign = () => `
+    <div class="doc-header">
+      <div class="doc-marca">TRACT · Gerador de Contratos</div>
+      <div class="doc-title">Contrato de Prestação de Serviços de Design</div>
+      <div class="doc-subtitle">Identidade Visual · UI/UX · Branding · Criação Gráfica</div>
+    </div>
+
+    <div class="preambulo">
+      Pelo presente instrumento particular, as partes abaixo qualificadas celebram o presente Contrato de Prestação de Serviços de Design, regido pelo Código Civil Brasileiro e pela Lei nº 9.610/1998 (Direitos Autorais), obrigando-se mutuamente às condições a seguir estabelecidas.
+    </div>
+
+    <div class="sec-title">I — Qualificação das Partes</div>
+
+    <div class="partes-title">Contratante</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Quem contrata os serviços de design</span>
+      <p><strong>Nome / Empresa:</strong> ${v('dc_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('dc_cpf')}</p>
+      <p><strong>E-mail:</strong> ${v('dc_email')} &nbsp;&nbsp; <strong>Instagram / Site:</strong> ${v('dc_redes')}</p>
+    </div>
+
+    <div class="partes-title">Designer / Estúdio (Contratado)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Quem executa os serviços criativos</span>
+      <p><strong>Nome / Estúdio:</strong> ${v('ds_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('ds_cpf')}</p>
+      <p><strong>E-mail:</strong> ${v('ds_email')} &nbsp;&nbsp; <strong>Portfólio:</strong> ${v('ds_portfolio')}</p>
+    </div>
+
+    <div class="sec-title">II — Escopo e Condições do Projeto</div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 1ª – DO OBJETO E ESCOPO CRIATIVO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_objeto || `<p>O presente contrato tem por objeto o desenvolvimento de <strong>${v('dg_tipo')}</strong> pelo CONTRATADO ao CONTRATANTE, compreendendo as seguintes entregas: <strong>${v('dg_entregas')}</strong>.</p><p>Os arquivos serão entregues nos formatos: <strong>${v('dg_formatos')}</strong>. O projeto contempla <strong>${v('dg_opcoes')}</strong> opções de conceito inicial, <strong>${v('dg_versoes')}</strong> versões completas e <strong>${v('dg_revisoes')}</strong> rodadas de ajuste por entrega. Entende-se por "revisão" pequenos ajustes de cor, texto ou posicionamento; alterações conceituais significativas após aprovação de uma direção serão tratadas como novo escopo e cobradas separadamente.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 2ª – DO PROCESSO CRIATIVO E PRAZOS</div>
+      <div class="clause-body">
+        <p>O projeto será conduzido nas seguintes etapas: (1) preenchimento de briefing pelo CONTRATANTE; (2) apresentação de opções de conceito inicial em até <strong>${v('dg_prazo_conceito')}</strong> dias úteis após recebimento de todos os materiais; (3) escolha de uma direção pelo CONTRATANTE e desenvolvimento completo; (4) apresentação da versão final para aprovação; (5) rodadas de ajuste conforme contratado; (6) entrega dos arquivos finais após quitação integral.</p>
+        <p>O CONTRATANTE compromete-se a fornecer feedback claro e objetivo em até <strong>${v('dg_prazo_feedback')}</strong> dias úteis após cada apresentação. Atrasos no retorno do CONTRATANTE impactarão diretamente nos prazos de entrega, sem que isso implique responsabilidade ou inadimplemento por parte do CONTRATADO.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 3ª – DO VALOR E FORMA DE PAGAMENTO</div>
+      <div class="clause-body">
+        <p>O valor total pelos serviços contratados é de <strong>${v('dg_valor')}</strong>, pago em duas parcelas: sinal de 50% (<strong>${v('dg_sinal')}</strong>) no início do projeto, antes do início de qualquer trabalho, e o saldo final de 50% (<strong>${v('dg_final')}</strong>) na entrega dos arquivos definitivos. O pagamento será realizado por <strong>${v('dg_forma')}</strong>, nos seguintes dados: ${v('dg_dados')}.</p>
+        <p>Os arquivos finais editáveis (incluindo .AI, .PSD, .Figma e outros formatos-fonte) serão entregues somente após a confirmação do pagamento integral. Durante o processo criativo, são compartilhados apenas arquivos em baixa resolução ou formatos não editáveis, para fins de aprovação. O atraso no pagamento implicará nas mesmas penalidades previstas no art. 395 do Código Civil.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 4ª – DOS DIREITOS AUTORAIS E USO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_propriedade_intelectual || `<p>Após a quitação integral dos valores contratados, os direitos patrimoniais sobre as criações desenvolvidas especificamente para o CONTRATANTE neste projeto são a ele cedidos para uso comercial irrestrito no território nacional, nos termos da Lei nº 9.610/1998.</p><p>O CONTRATADO mantém, em caráter irrenunciável nos termos da lei, o direito moral de autoria sobre as obras criadas, bem como o direito de apresentar os trabalhos realizados em seu portfólio, site e redes sociais profissionais, salvo proibição expressa formalizada em cláusula adicional específica. Fontes tipográficas, bancos de imagem e elementos de terceiros utilizados estão sujeitos às licenças de seus respectivos detentores, sendo responsabilidade do CONTRATANTE verificar e adquirir as licenças adequadas ao uso comercial pretendido.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 5ª – DA RESCISÃO E REEMBOLSOS${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_rescisao || `<p>Em caso de cancelamento pelo CONTRATANTE: (a) antes da apresentação do conceito inicial, será reembolsado 70% do sinal pago, retendo-se 30% a título de ressarcimento por horas de pesquisa e planejamento já realizadas; (b) após a apresentação do conceito e antes da entrega final, o sinal pago não será reembolsado, e o material produzido até o momento de cancelamento permanecerá de propriedade do CONTRATADO.</p><p>Em caso de cancelamento pelo CONTRATADO sem justa causa após o início dos trabalhos, este reembolsará integralmente o sinal recebido, acrescido de 10% do valor total do contrato a título de multa compensatória.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 6ª – DISPOSIÇÕES GERAIS E FORO</div>
+      <div class="clause-body">
+        <p>O CONTRATANTE declara que todos os materiais, textos, logotipos e referências fornecidos ao CONTRATADO são de sua propriedade ou de uso devidamente autorizado, eximindo o CONTRATADO de qualquer responsabilidade perante terceiros decorrente de materiais fornecidos pelo CONTRATANTE. As partes elegem o foro da Comarca de <strong>${v('dg_cidade')}</strong> para dirimir eventuais litígios, renunciando a qualquer outro.</p>
+      </div>
+    </div>
+
+    ${sigBlock(
+      { role: 'Contratante', nome: v('dc_nome'), doc: v('dc_cpf') },
+      { role: 'Designer / Estúdio', nome: v('ds_nome'), doc: v('ds_cpf') }
+    )}
+  `
+
+  // ─── TEMPLATE: INFLUENCER MARKETING ───────────────────────────────────────
+  const tmplInfluencer = () => `
+    <div class="doc-header">
+      <div class="doc-marca">TRACT · Gerador de Contratos</div>
+      <div class="doc-title">Contrato de Influencer Marketing</div>
+      <div class="doc-subtitle">Instrumento Particular de Parceria Comercial para Divulgação Paga</div>
+    </div>
+
+    <div class="preambulo">
+      Pelo presente instrumento particular, as partes abaixo qualificadas celebram o presente Contrato de Influencer Marketing, em conformidade com o Código Civil Brasileiro, as diretrizes do CONAR, a Resolução nº 163/2021 do CONANDA e demais normas aplicáveis à publicidade e ao marketing digital no Brasil.
+    </div>
+
+    <div class="sec-title">I — Qualificação das Partes</div>
+
+    <div class="partes-title">Marca / Empresa (Contratante)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Empresa que contrata a divulgação</span>
+      <p><strong>Razão Social / Nome:</strong> ${v('mk_nome')}</p>
+      <p><strong>CNPJ / CPF:</strong> ${v('mk_cnpj')}</p>
+      <p><strong>Representante Legal:</strong> ${v('mk_rep')}</p>
+      <p><strong>E-mail:</strong> ${v('mk_email')} &nbsp;&nbsp; <strong>Telefone:</strong> ${v('mk_tel')}</p>
+    </div>
+
+    <div class="partes-title">Influenciador(a) / Criador(a) de Conteúdo (Contratado)</div>
+    <div class="parte-bloco">
+      <span class="parte-label">Criador(a) que realizará a divulgação</span>
+      <p><strong>Nome / Nome Artístico:</strong> ${v('inf_nome')}</p>
+      <p><strong>CPF / CNPJ:</strong> ${v('inf_cpf')}</p>
+      <p><strong>E-mail:</strong> ${v('inf_email')}</p>
+      <p><strong>Perfis:</strong> ${v('inf_arrobas')} &nbsp;&nbsp; <strong>Seguidores na data:</strong> ${v('inf_seguidores')}</p>
+    </div>
+
+    <div class="sec-title">II — Objeto e Escopo da Campanha</div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 1ª – DO OBJETO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_objeto || `<p>O presente contrato tem por objeto a divulgação paga, pelo CONTRATADO, do seguinte produto ou serviço: <strong>${v('cp_produto')}</strong>, de titularidade da CONTRATANTE, nas plataformas digitais especificadas, mediante os formatos e condições estabelecidas neste instrumento.</p><p>Serão realizadas <strong>${v('cp_qtd')}</strong> publicações, nos formatos: <strong>${v('cp_formatos')}</strong>, na plataforma <strong>${v('cp_plataforma')}</strong>, no período compreendido entre <strong>${v('cp_inicio')}</strong> e <strong>${v('cp_fim')}</strong>. As publicações deverão permanecer no ar pelo período mínimo de ${v('cp_tempo_stories', 'não especificado')} horas nos Stories e ${v('cp_tempo_feed', 'não especificado')} dias no Feed.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 2ª – DAS DIRETRIZES DE CONTEÚDO E CONFORMIDADE LEGAL</div>
+      <div class="clause-body">
+        <p>Todo o conteúdo publicado deverá identificar de forma clara, explícita e destacada o seu caráter publicitário, mediante o uso obrigatório das marcações <strong>#publi</strong>, <strong>#parceria</strong>, <strong>#ad</strong> ou da expressão "conteúdo patrocinado", em conformidade com as normas do CONAR e da Resolução nº 163/2021 do CONANDA, quando aplicável. O descumprimento desta obrigação é de exclusiva responsabilidade do CONTRATADO.</p>
+        <p>As publicações deverão incluir obrigatoriamente a menção: <strong>${v('cn_mencao')}</strong>${data.cn_link ? `, bem como o link ou código: <strong>${data.cn_link}</strong>` : ''}. O CONTRATADO terá liberdade criativa para adaptar o conteúdo ao seu estilo e linguagem, desde que respeitadas as diretrizes de marca da CONTRATANTE constantes no briefing fornecido.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 3ª – DO PROCESSO DE APROVAÇÃO DE CONTEÚDO</div>
+      <div class="clause-body">
+        <p>O CONTRATADO deverá enviar o conteúdo para aprovação da CONTRATANTE com antecedência mínima de <strong>${v('cn_prazo_envio')}</strong> dias úteis em relação à data prevista de publicação. A CONTRATANTE terá até <strong>${v('cn_prazo_aprov')}</strong> dias úteis para aprovar ou solicitar ajustes, sendo permitidas até <strong>${v('cn_rodadas')}</strong> rodadas de alteração sem custo adicional. Decorrido o prazo sem manifestação, o conteúdo será considerado tacitamente aprovado. O CONTRATADO não se responsabiliza por atrasos nas publicações causados por demora na aprovação pela CONTRATANTE.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 4ª – DO VALOR E FORMA DE PAGAMENTO</div>
+      <div class="clause-body">
+        <p>Pela execução da campanha, a CONTRATANTE pagará ao CONTRATADO o valor total de <strong>${v('inf_valor')}</strong>, mediante <strong>${v('inf_forma')}</strong>, até a data de <strong>${v('inf_data_pag')}</strong>, nos seguintes dados: ${v('inf_dados')}.${data.inf_produtos ? ` Além da remuneração em dinheiro, a CONTRATANTE fornecerá ao CONTRATADO: ${data.inf_produtos}.` : ''}</p>
+        <p>O atraso no pagamento superior a 10 (dez) dias corridos autoriza o CONTRATADO a excluir os conteúdos publicados e rescindir o contrato sem penalidades, sem prejuízo da cobrança dos valores devidos acrescidos de multa de 2% e juros de 1% ao mês. Após o encerramento da campanha, o CONTRATADO deverá enviar à CONTRATANTE um relatório de métricas (alcance, impressões, engajamento) em até <strong>${v('inf_prazo_rel')}</strong> dias.</p>
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 5ª – DOS DIREITOS DE USO DO CONTEÚDO${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_propriedade_intelectual || `<p>A CONTRATANTE poderá fazer repost do conteúdo publicado em seus perfis oficiais, desde que mantida a identificação do CONTRATADO como autor. O uso do conteúdo em anúncios pagos (dark posts, boosting) ou materiais offline requer autorização específica adicional e poderá implicar remuneração suplementar a ser negociada entre as partes. Qualquer uso não previsto neste contrato deverá ser formalizado por escrito.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 6ª – DA NÃO-CONCORRÊNCIA${aiBadge}</div>
+      <div class="clause-body">
+        ${IA.clausula_rescisao || `<p>Durante o período da campanha e por <strong>${v('cn_excl_prazo')}</strong> dias após seu término, o CONTRATADO compromete-se a não divulgar, a qualquer título — inclusive de forma espontânea ou orgânica — produtos ou serviços que concorram diretamente com os da CONTRATANTE na categoria: <strong>${v('cn_excl_cat')}</strong>. O descumprimento desta cláusula implicará multa equivalente a 100% (cem por cento) do valor total do contrato, além de perdas e danos eventualmente apurados.</p>`}
+      </div>
+    </div>
+
+    <div class="clause">
+      <div class="clause-title">CLÁUSULA 7ª – DAS RESPONSABILIDADES E FORO</div>
+      <div class="clause-body">
+        <p>O CONTRATADO é responsável pelo conteúdo publicado e por garantir que não viola direitos de imagem, musicais ou de propriedade intelectual de terceiros. A CONTRATANTE é responsável pela veracidade das informações sobre o produto ou serviço divulgado; reclamações de consumidores relacionadas ao produto são de sua exclusiva responsabilidade. As partes elegem o foro da Comarca de <strong>${v('inf_cidade')}</strong> para dirimir eventuais litígios.</p>
+      </div>
+    </div>
+
+    ${sigBlock(
+      { role: 'Marca / Empresa', nome: v('mk_nome'), doc: v('mk_cnpj'), extra: `<div class="sig-detail">Representante: ${v('mk_rep')}</div>` },
+      { role: 'Influenciador(a)', nome: v('inf_nome'), doc: v('inf_cpf') }
+    )}
   `
 
   const templates = {
-    servicos: `
-      <div class="header"><div class="tipo">Contrato · Prestação de Serviços</div><div class="title">Contrato de Prestação de Serviços</div></div>
-      <div class="sec-title">Qualificação das Partes</div>${partesServicos}
-      <div class="sec-title">Cláusulas Contratuais</div>${clausulasServicos}
-      <div class="sigs">
-        <div class="sig"><div class="sig-role">Contratante</div><div class="sig-name">${v('cont_nome')}</div><div style="font-size:9pt;color:#A09890">CPF/CNPJ: ${v('cont_cpf')}</div></div>
-        <div class="sig"><div class="sig-role">Contratado(a)</div><div class="sig-name">${v('tado_nome')}</div><div style="font-size:9pt;color:#A09890">CPF/CNPJ: ${v('tado_cpf')}</div></div>
-      </div>
-    `,
-    software: `
-      <div class="header"><div class="tipo">Contrato · Desenvolvimento de Software</div><div class="title">Contrato de Desenvolvimento de Software</div></div>
-      <div class="sec-title">Qualificação das Partes</div>
-      <p style="font-size:10pt;font-weight:700;margin:0 0 6px">CLIENTE:</p>
-      <table><tr><td class="lbl">Nome</td><td>${v('cli_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('cli_cpf')}</td></tr><tr><td class="lbl">Representante</td><td>${v('cli_rep')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('cli_email')}</td></tr></table>
-      <p style="font-size:10pt;font-weight:700;margin:12px 0 6px">DESENVOLVEDOR(A):</p>
-      <table><tr><td class="lbl">Nome</td><td>${v('dev_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('dev_cpf')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('dev_email')}</td></tr></table>
-      <div class="sec-title">Dados do Projeto</div>
-      <table><tr><td class="lbl">Nome</td><td>${v('proj_nome')}</td></tr><tr><td class="lbl">Tipo</td><td>${v('proj_tipo')}</td></tr><tr><td class="lbl">Plataformas</td><td>${v('proj_plataformas')}</td></tr><tr><td class="lbl">Stack</td><td>${v('proj_stack')}</td></tr></table>
-      <div class="sec-title">Milestones e Pagamentos</div>
-      <table><tr><th>Fase</th><th>Entregável</th><th>Prazo</th><th>Valor</th></tr>${['1','2','3'].map(n => data[`ms${n}_fase`] ? `<tr><td>${data[`ms${n}_fase`]}</td><td>${v(`ms${n}_entrega`)}</td><td>${v(`ms${n}_prazo`)}</td><td>${v(`ms${n}_valor`)}</td></tr>` : '').join('')}</table>
-      <div class="sec-title">Cláusulas Contratuais</div>
-      <div class="clause"><div class="clause-title">Cláusula 1ª – Do Objeto ${aiBadge}</div><div class="clause-body">${obj || `Desenvolvimento do projeto ${v('proj_nome')}: ${v('proj_escopo')}`}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 2ª – Controle de Mudanças de Escopo</div><div class="clause-body">Qualquer alteração deverá ser formalizada via Change Request, com impacto em prazo, custo adicional e assinatura das partes. Mudanças sem aprovação não serão desenvolvidas.</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 3ª – Pagamento</div><div class="clause-body">Total: <strong>${v('sw_valor_total')}</strong> | Entrada (${v('sw_pct_entrada')}%): ${v('sw_valor_entrada')} | Final (${v('sw_pct_final')}%): ${v('sw_valor_final')}<br>Forma: ${v('sw_forma_pag')} | Dados: ${v('sw_dados_banco')}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 4ª – Obrigações ${aiBadge}</div><div class="clause-body">${obrig_tado || 'Executar o desenvolvimento conforme o escopo acordado, comunicar impedimentos e realizar testes antes de cada entrega.'}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 5ª – Propriedade Intelectual ${aiBadge}</div><div class="clause-body">${pi || 'Código-fonte e documentação transferidos ao CLIENTE após quitação integral. Bibliotecas open-source sujeitas às suas licenças.'}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 6ª – Garantia Técnica</div><div class="clause-body">Garantia de ${v('sw_garantia')} dias após entrega. Aceite em ${v('sw_prazo_aceite')} dias úteis. Ausência de resposta = aceite tácito.</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 7ª – Confidencialidade</div><div class="clause-body">NDA de ${v('sw_nda_anos')} anos após encerramento. Foro: ${v('sw_cidade_foro')}.</div></div>
-      <div class="sigs">
-        <div class="sig"><div class="sig-role">Cliente</div><div class="sig-name">${v('cli_nome')}</div></div>
-        <div class="sig"><div class="sig-role">Desenvolvedor(a)</div><div class="sig-name">${v('dev_nome')}</div></div>
-      </div>
-    `,
-    design: `
-      <div class="header"><div class="tipo">Contrato · Design e Criação</div><div class="title">Contrato de Prestação de Serviços de Design</div></div>
-      <div class="sec-title">Qualificação das Partes</div>
-      <table><tr><td class="lbl">Contratante</td><td>${v('dc_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('dc_cpf')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('dc_email')}</td></tr></table>
-      <table><tr><td class="lbl">Designer / Estúdio</td><td>${v('ds_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('ds_cpf')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('ds_email')}</td></tr></table>
-      <div class="sec-title">Escopo Criativo</div>
-      <table><tr><td class="lbl">Tipo</td><td>${v('dg_tipo')}</td></tr><tr><td class="lbl">Formatos</td><td>${v('dg_formatos')}</td></tr><tr><td class="lbl">Opções de conceito</td><td>${v('dg_opcoes')}</td></tr><tr><td class="lbl">Versões</td><td>${v('dg_versoes')}</td></tr><tr><td class="lbl">Rodadas de ajuste</td><td>${v('dg_revisoes')}</td></tr></table>
-      <div class="sec-title">Cláusulas Contratuais</div>
-      <div class="clause"><div class="clause-title">Cláusula 1ª – Do Objeto ${aiBadge}</div><div class="clause-body">${obj || `Desenvolvimento de ${v('dg_tipo')} com as seguintes entregas: ${v('dg_entregas')}`}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 2ª – Pagamento</div><div class="clause-body">Total: <strong>${v('dg_valor')}</strong> | Sinal (50%): ${v('dg_sinal')} | Final: ${v('dg_final')}<br>Forma: ${v('dg_forma')} | Dados: ${v('dg_dados')}<br>Arquivos editáveis entregues apenas após quitação integral.</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 3ª – Direitos Autorais ${aiBadge}</div><div class="clause-body">${pi || 'Direitos patrimoniais transferidos após quitação. O designer mantém autoria moral (Lei 9.610/98) e direito de exibição em portfólio.'}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 4ª – Rescisão ${aiBadge}</div><div class="clause-body">${rescisao || 'Cancelamento antes do conceito: reembolso de 70% do sinal. Após conceito: sem reembolso.'}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 5ª – Foro</div><div class="clause-body">Comarca de ${v('dg_cidade')}.</div></div>
-      <div class="sigs">
-        <div class="sig"><div class="sig-role">Contratante</div><div class="sig-name">${v('dc_nome')}</div></div>
-        <div class="sig"><div class="sig-role">Designer / Estúdio</div><div class="sig-name">${v('ds_nome')}</div></div>
-      </div>
-    `,
-    influencer: `
-      <div class="header"><div class="tipo">Contrato · Influencer Marketing</div><div class="title">Contrato de Influencer Marketing / Publipost</div></div>
-      <div class="sec-title">Qualificação das Partes</div>
-      <table><tr><td class="lbl">Marca</td><td>${v('mk_nome')}</td></tr><tr><td class="lbl">CNPJ/CPF</td><td>${v('mk_cnpj')}</td></tr><tr><td class="lbl">Representante</td><td>${v('mk_rep')}</td></tr><tr><td class="lbl">E-mail</td><td>${v('mk_email')}</td></tr></table>
-      <table><tr><td class="lbl">Influencer</td><td>${v('inf_nome')}</td></tr><tr><td class="lbl">CPF/CNPJ</td><td>${v('inf_cpf')}</td></tr><tr><td class="lbl">Perfis</td><td>${v('inf_arrobas')}</td></tr><tr><td class="lbl">Seguidores</td><td>${v('inf_seguidores')}</td></tr></table>
-      <div class="sec-title">Campanha</div>
-      <table><tr><td class="lbl">Produto</td><td>${v('cp_produto')}</td></tr><tr><td class="lbl">Plataforma</td><td>${v('cp_plataforma')}</td></tr><tr><td class="lbl">Formatos</td><td>${v('cp_formatos')}</td></tr><tr><td class="lbl">Publicações</td><td>${v('cp_qtd')}</td></tr><tr><td class="lbl">Período</td><td>${v('cp_inicio')} a ${v('cp_fim')}</td></tr></table>
-      <div class="sec-title">Cláusulas Contratuais</div>
-      <div class="clause"><div class="clause-title">Cláusula 1ª – Do Objeto ${aiBadge}</div><div class="clause-body">${obj || `Divulgação paga de ${v('cp_produto')} em ${v('cp_plataforma')}: ${v('cp_formatos')}.`}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 2ª – Conteúdo e CONAR</div><div class="clause-body">Todo conteúdo deve identificar o caráter publicitário (#publi, #parceria, #ad). Menção obrigatória: ${v('cn_mencao')}. ${data.cn_link ? 'Link: ' + data.cn_link : ''}<br>Envio para aprovação: ${v('cn_prazo_envio')} dias antes. Aprovação da marca: ${v('cn_prazo_aprov')} dias úteis. Máx. ajustes: ${v('cn_rodadas')} rodadas.</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 3ª – Pagamento</div><div class="clause-body">Total: <strong>${v('inf_valor')}</strong> | Forma: ${v('inf_forma')} | Data: ${v('inf_data_pag')}<br>${data.inf_produtos ? 'Brindes: ' + data.inf_produtos + '<br>' : ''}Relatório de métricas: ${v('inf_prazo_rel')} dias após encerramento.</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 4ª – Não-Concorrência ${aiBadge}</div><div class="clause-body">${rescisao || `Por ${v('cn_excl_prazo')} dias após a campanha, o influencer não divulgará concorrentes na categoria: ${v('cn_excl_cat')}.`}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 5ª – Direitos de Uso do Conteúdo ${aiBadge}</div><div class="clause-body">${pi || 'A marca pode fazer repost nos perfis oficiais. Uso em anúncios pagos requer autorização expressa adicional.'}</div></div>
-      <div class="clause"><div class="clause-title">Cláusula 6ª – Foro</div><div class="clause-body">Comarca de ${v('inf_cidade')}.</div></div>
-      <div class="sigs">
-        <div class="sig"><div class="sig-role">Marca / Empresa</div><div class="sig-name">${v('mk_nome')}</div></div>
-        <div class="sig"><div class="sig-role">Influenciador(a)</div><div class="sig-name">${v('inf_nome')}</div></div>
-      </div>
-    `,
+    servicos:   tmplServicos(),
+    software:   tmplSoftware(),
+    design:     tmplDesign(),
+    influencer: tmplInfluencer(),
   }
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${css}</style></head><body>${templates[tipo] || ''}</body></html>`
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>${css}</style>
+</head>
+<body>${templates[tipo] || '<p>Tipo de contrato não reconhecido.</p>'}</body>
+</html>`
 }
 
 // ─── GERADOR PRINCIPAL ────────────────────────────────────────────────────────
 
 export default function Gerador() {
   const navigate = useNavigate()
+  const { salvarContrato } = useContratos()
   const [tipo, setTipo] = useState('servicos')
   const [step, setStep] = useState(0)
   const [data, setData] = useState({})
@@ -497,8 +1014,33 @@ export default function Gerador() {
   const [sugestoes, setSugestoes] = useState(null)
   const [loadingAI, setLoadingAI] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const pdfRef = useRef(null)
+
+  // Detecta resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Carrega contrato salvo vindo do perfil
+  useEffect(() => {
+    const salvo = sessionStorage.getItem('tract_carregar_contrato')
+    if (salvo) {
+      try {
+        const contrato = JSON.parse(salvo)
+        setTipo(contrato.tipo || 'servicos')
+        setData(contrato.data || {})
+        setClausulas(contrato.clausulasIA || null)
+        setStep(STEPS[contrato.tipo || 'servicos'].length - 1) // vai direto ao preview
+        sessionStorage.removeItem('tract_carregar_contrato')
+      } catch {}
+    }
+  }, [])
 
   const steps = STEPS[tipo]
   const stepMap = STEP_MAP[tipo]
@@ -603,87 +1145,142 @@ export default function Gerador() {
     }
   }
 
-  const currentGroup = stepMap[step]
+  const handleSalvar = async () => {
+    setSaving(true)
+    try {
+      salvarContrato({ tipo, data, clausulasIA: clausulas })
+      showToast('✓ Contrato salvo no seu perfil!')
+    } catch {
+      showToast('Erro ao salvar contrato.', false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleNovoContrato = () => {
+    setTipo('servicos')
+    setStep(0)
+    setData({})
+    setClausulas(null)
+    setAlertas(null)
+    setSugestoes(null)
+  }
   const currentFields = currentGroup && currentGroup !== 'preview' ? fields[currentGroup] : null
   const [stepTitle, stepDesc] = STEP_LABELS[currentGroup] || ['', '']
 
   return (
-    <div style={S.app}>
+    <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg)' }}>
+
+      {/* OVERLAY MOBILE */}
+      {isMobile && sidebarOpen && (
+        <div onClick={() => setSidebarOpen(false)}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:40 }} />
+      )}
+
       {/* SIDEBAR */}
-      <aside style={S.sidebar}>
-        <div
-          style={{ ...S.sidebarLogo, cursor:'pointer' }}
-          onClick={() => navigate('/')}
-          title="Voltar à página inicial"
-        >
+      <aside style={{
+        width:260, minHeight:'100vh', background:'#1A1612', color:'#F7F5F0',
+        padding:'32px 24px', position:'fixed', top:0, left:0, bottom:0,
+        display:'flex', flexDirection:'column', overflowY:'auto', zIndex:50,
+        transition:'transform .25s ease',
+        transform: isMobile && !sidebarOpen ? 'translateX(-100%)' : 'translateX(0)',
+      }}>
+        <div style={{ fontFamily:'var(--font-display)', fontSize:20, color:'#F7F5F0', marginBottom:6, cursor:'pointer' }}
+          onClick={() => { navigate('/'); setSidebarOpen(false) }}>
           TR<span style={{ color:'var(--accent2)' }}>A</span>CT
         </div>
-        <div style={S.sidebarSub}>Gerador com IA</div>
+        <div style={{ fontSize:10, color:'#5C5448', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:32 }}>Gerador com IA</div>
 
-        <div style={{ marginBottom:36 }}>
-          <div style={S.sidebarSecLabel}>Tipo de contrato</div>
+        <div style={{ marginBottom:28 }}>
+          <div style={{ fontSize:10, letterSpacing:'.1em', textTransform:'uppercase', color:'#5C5448', marginBottom:10, fontWeight:700 }}>Tipo de contrato</div>
           {TIPOS.map(t => (
-            <button key={t.id} style={S.typeBtn(tipo === t.id)} onClick={() => handleTipoChange(t.id)}>
+            <button key={t.id}
+              style={{ display:'block', width:'100%', textAlign:'left', background: tipo===t.id?'rgba(200,80,42,.15)':'none', border:'none', borderLeft:`2px solid ${tipo===t.id?'#E8A87C':'transparent'}`, color: tipo===t.id?'#F7F5F0':'#7A7268', fontFamily:'var(--font-body)', fontSize:13, padding:'7px 10px', cursor:'pointer', marginBottom:2 }}
+              onClick={() => { handleTipoChange(t.id); setSidebarOpen(false) }}>
               {t.icon} {t.label}
             </button>
           ))}
         </div>
 
-        <div style={{ marginBottom:36 }}>
-          <div style={S.sidebarSecLabel}>Progresso</div>
+        <div style={{ marginBottom:28 }}>
+          <div style={{ fontSize:10, letterSpacing:'.1em', textTransform:'uppercase', color:'#5C5448', marginBottom:10, fontWeight:700 }}>Progresso</div>
           {steps.map((s, i) => {
             const state = i < step ? 'done' : i === step ? 'active' : 'idle'
             return (
-              <div key={i} style={S.stepItem(state)}>
-                <div style={S.stepDot(state)}>{state === 'done' ? '✓' : i + 1}</div>
+              <div key={i} onClick={() => i < step && setStep(i)}
+                style={{ display:'flex', alignItems:'center', gap:10, padding:'5px 0', fontSize:12, color: state==='done'?'#E8A87C':state==='active'?'#F7F5F0':'#3A3530', cursor: i<step?'pointer':'default' }}>
+                <div style={{ width:18, height:18, borderRadius:'50%', border:`1.5px solid ${state==='done'?'#E8A87C':state==='active'?'#E8A87C':'#3A3530'}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, flexShrink:0, fontWeight:700, background:state==='done'?'#E8A87C':'none', color:state==='done'?'#1A1612':state==='active'?'#E8A87C':'#3A3530' }}>
+                  {state==='done'?'✓':i+1}
+                </div>
                 {s}
               </div>
             )
           })}
         </div>
 
-        <div style={{ marginTop:'auto', fontSize:11, color:'#3A3530', lineHeight:1.7 }}>
-          Clique no logo para voltar à página inicial.
+        <div style={{ marginTop:'auto', display:'flex', flexDirection:'column', gap:8 }}>
+          <button onClick={() => { navigate('/perfil'); setSidebarOpen(false) }}
+            style={{ padding:'9px 12px', background:'rgba(255,255,255,.06)', border:'1px solid #3A3530', color:'#9A9088', borderRadius:3, fontSize:12, cursor:'pointer', textAlign:'left', fontFamily:'var(--font-body)' }}>
+            👤 Meu perfil
+          </button>
+          <button onClick={handleNovoContrato}
+            style={{ padding:'9px 12px', background:'none', border:'1px solid #3A3530', color:'#5C5448', borderRadius:3, fontSize:12, cursor:'pointer', textAlign:'left', fontFamily:'var(--font-body)' }}>
+            + Novo contrato
+          </button>
         </div>
       </aside>
 
+      {/* MOBILE TOPBAR */}
+      {isMobile && (
+        <div style={{ position:'fixed', top:0, left:0, right:0, height:52, background:'#1A1612', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', zIndex:35 }}>
+          <button onClick={() => setSidebarOpen(o => !o)}
+            style={{ background:'none', border:'none', color:'#F7F5F0', fontSize:20, cursor:'pointer', padding:'4px 8px', lineHeight:1 }}>☰</button>
+          <span style={{ fontFamily:'var(--font-display)', fontSize:18, color:'#F7F5F0' }}>
+            TR<span style={{ color:'#C8502A' }}>A</span>CT
+          </span>
+          <button onClick={() => navigate('/perfil')}
+            style={{ background:'none', border:'none', color:'#9A9088', fontSize:18, cursor:'pointer', padding:'4px 8px' }}>👤</button>
+        </div>
+      )}
+
       {/* MAIN */}
-      <main style={S.main}>
-        <div style={S.progressBar}><div style={S.progressFill(progress)} /></div>
+      <main style={{ marginLeft: isMobile?0:260, flex:1, padding: isMobile?'72px 16px 100px':'40px 48px', maxWidth: isMobile?'100vw':'calc(100vw - 260px)', width:'100%' }}>
+        <div style={{ height:2, background:'#E2DDD6', borderRadius:1, marginBottom: isMobile?24:36, overflow:'hidden' }}>
+          <div style={{ height:'100%', background:'var(--accent)', borderRadius:1, transition:'width .4s', width:`${Math.round((step/(steps.length-1))*100)}%` }} />
+        </div>
 
         {/* STEP 0 — TIPO */}
         {step === 0 && (
           <div>
-            <div style={{ marginBottom:32 }}>
-              <div style={S.pageTitle}>Qual tipo de <em style={{ color:'var(--accent)', fontStyle:'normal' }}>contrato</em>?</div>
-              <div style={S.pageDesc}>Selecione o modelo que melhor descreve o serviço que você vai prestar.</div>
+            <div style={{ marginBottom:24 }}>
+              <div style={{ fontFamily:'var(--font-display)', fontSize: isMobile?24:32, color:'var(--ink)', lineHeight:1.1, marginBottom:6 }}>
+                Qual tipo de <em style={{ color:'var(--accent)', fontStyle:'normal' }}>contrato</em>?
+              </div>
+              <div style={{ fontSize:13, color:'var(--ink3)' }}>Selecione o modelo que melhor descreve o serviço.</div>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
               {TIPOS.map(t => (
-                <div key={t.id}
-                  onClick={() => handleTipoChange(t.id)}
-                  style={{ background: tipo===t.id ? 'var(--ink)' : 'var(--surface)', color: tipo===t.id ? '#F7F5F0' : 'var(--ink)', border:`1.5px solid ${tipo===t.id ? 'var(--ink)' : 'var(--border)'}`, borderRadius:6, padding:'24px 22px', cursor:'pointer', transition:'all .15s' }}>
-                  <div style={{ fontSize:26, marginBottom:10 }}>{t.icon}</div>
-                  <div style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:4 }}>{t.label}</div>
-                  <div style={{ fontSize:13, opacity:.6 }}>{t.desc}</div>
+                <div key={t.id} onClick={() => handleTipoChange(t.id)}
+                  style={{ background: tipo===t.id?'var(--ink)':'var(--surface)', color: tipo===t.id?'#F7F5F0':'var(--ink)', border:`1.5px solid ${tipo===t.id?'var(--ink)':'var(--border)'}`, borderRadius:6, padding: isMobile?'14px 12px':'22px 20px', cursor:'pointer', transition:'all .15s' }}>
+                  <div style={{ fontSize: isMobile?20:24, marginBottom:6 }}>{t.icon}</div>
+                  <div style={{ fontFamily:'var(--font-display)', fontSize: isMobile?13:16, marginBottom:2, lineHeight:1.2 }}>{t.label}</div>
+                  {!isMobile && <div style={{ fontSize:12, opacity:.6 }}>{t.desc}</div>}
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* STEPS DE FORMULÁRIO */}
+        {/* STEPS FORMULÁRIO */}
         {step > 0 && !isPreview && currentFields && (
           <div>
-            <div style={{ marginBottom:28 }}>
-              <div style={S.pageTitle}>{stepTitle}</div>
-              <div style={S.pageDesc}>{stepDesc}</div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontFamily:'var(--font-display)', fontSize: isMobile?20:28, color:'var(--ink)', lineHeight:1.1, marginBottom:4 }}>{stepTitle}</div>
+              <div style={{ fontSize:13, color:'var(--ink3)' }}>{stepDesc}</div>
             </div>
-            <div style={S.card}>
-              <div style={S.fieldGrid(2)}>
-                {currentFields.map(f => (
-                  <FieldInput key={f.key} def={f} value={data[f.key]} onChange={handleChange} />
-                ))}
+            <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:6, padding: isMobile?'18px 14px':'28px 32px', marginBottom:16 }}>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile?'1fr':'1fr 1fr', gap:14 }}>
+                {currentFields.map(f => <FieldInput key={f.key} def={f} value={data[f.key]} onChange={handleChange} />)}
               </div>
             </div>
           </div>
@@ -692,29 +1289,20 @@ export default function Gerador() {
         {/* PREVIEW */}
         {isPreview && (
           <div>
-            <div style={{ marginBottom:28 }}>
-              <div style={S.pageTitle}>Revisar e <em style={{ color:'var(--accent)', fontStyle:'normal' }}>baixar</em></div>
-              <div style={S.pageDesc}>Gere cláusulas personalizadas com IA e depois baixe o PDF.</div>
+            <div style={{ marginBottom:20 }}>
+              <div style={{ fontFamily:'var(--font-display)', fontSize: isMobile?20:28, color:'var(--ink)', lineHeight:1.1, marginBottom:4 }}>
+                Revisar e <em style={{ color:'var(--accent)', fontStyle:'normal' }}>baixar</em>
+              </div>
+              <div style={{ fontSize:13, color:'var(--ink3)' }}>Gere cláusulas com IA e baixe o PDF profissional.</div>
             </div>
-
-            {/* PAINEL IA */}
-            <PainelClausulas
-              clausulas={clausulas}
-              alertas={alertas}
-              sugestoes={sugestoes}
-              loading={loadingAI}
-              onGerar={gerarClausulas}
-              temDados={temDados}
-            />
-
-            {/* RESUMO */}
-            <div style={{ ...S.card, marginTop:0 }}>
-              <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)', marginBottom:16 }}>Resumo dos dados</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1px', background:'var(--border)', border:'1px solid var(--border)', borderRadius:4, overflow:'hidden' }}>
-                {Object.entries(data).filter(([,v]) => v).slice(0, 12).map(([k, v]) => (
-                  <div key={k} style={{ background:'var(--surface)', padding:'8px 14px' }}>
+            <PainelClausulas clausulas={clausulas} alertas={alertas} sugestoes={sugestoes} loading={loadingAI} onGerar={gerarClausulas} temDados={temDados} />
+            <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:6, padding: isMobile?'14px':'22px 28px', marginTop:0 }}>
+              <div style={{ fontSize:13, fontWeight:600, color:'var(--ink)', marginBottom:12 }}>Resumo dos dados</div>
+              <div style={{ display:'grid', gridTemplateColumns: isMobile?'1fr':'1fr 1fr', gap:1, background:'var(--border)', border:'1px solid var(--border)', borderRadius:4, overflow:'hidden' }}>
+                {Object.entries(data).filter(([,v]) => v).slice(0, isMobile?6:12).map(([k, v]) => (
+                  <div key={k} style={{ background:'var(--surface)', padding:'8px 12px' }}>
                     <div style={{ fontSize:10, color:'var(--ink3)', textTransform:'uppercase', letterSpacing:'.04em', marginBottom:2 }}>{k.replace(/_/g,' ')}</div>
-                    <div style={{ fontSize:13, color:'var(--ink)' }}>{String(v).slice(0,60)}{String(v).length > 60 ? '…' : ''}</div>
+                    <div style={{ fontSize:12, color:'var(--ink)' }}>{String(v).slice(0,50)}{String(v).length>50?'…':''}</div>
                   </div>
                 ))}
               </div>
@@ -722,28 +1310,56 @@ export default function Gerador() {
           </div>
         )}
 
-        {/* NAV */}
-        <div style={S.nav}>
-          <button style={{ ...S.btnGhost, visibility: step === 0 ? 'hidden' : 'visible' }} onClick={() => setStep(s => Math.max(0, s - 1))}>
+        {/* NAV BUTTONS */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:20, flexWrap:'wrap', gap:8 }}>
+          <button onClick={() => setStep(s => Math.max(0,s-1))}
+            style={{ padding:'10px 18px', borderRadius:'var(--radius)', border:'1px solid var(--border2)', background:'none', color:'var(--ink2)', fontFamily:'var(--font-body)', fontSize:13, fontWeight:600, cursor:'pointer', visibility: step===0?'hidden':'visible' }}>
             ← Voltar
           </button>
-          {!isPreview ? (
-            <button style={S.btnPrimary} onClick={() => setStep(s => s + 1)}>
-              {step === 0 ? 'Começar →' : 'Próximo →'}
-            </button>
-          ) : (
-            <button style={{ ...S.btnDownload, opacity: generating ? .6 : 1 }} onClick={handleDownload} disabled={generating}>
-              {generating ? '⏳ Gerando PDF...' : '↓ Baixar PDF'}
-            </button>
-          )}
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+            {isPreview && (
+              <button onClick={handleSalvar} disabled={saving}
+                style={{ padding:'10px 16px', borderRadius:'var(--radius)', background:'#1D4ED8', color:'#fff', border:'none', fontFamily:'var(--font-body)', fontSize:13, fontWeight:600, cursor:'pointer', opacity:saving?.6:1 }}>
+                {saving?'⏳ Salvando...':'💾 Salvar no perfil'}
+              </button>
+            )}
+            {!isPreview ? (
+              <button onClick={() => setStep(s => s+1)}
+                style={{ padding:'10px 20px', borderRadius:'var(--radius)', background:'var(--ink)', color:'#F7F5F0', border:'none', fontFamily:'var(--font-body)', fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                {step===0?'Começar →':'Próximo →'}
+              </button>
+            ) : (
+              <button onClick={handleDownload} disabled={generating}
+                style={{ padding:'10px 20px', borderRadius:'var(--radius)', background:'var(--green)', color:'#fff', border:'none', fontFamily:'var(--font-body)', fontSize:13, fontWeight:600, cursor:'pointer', opacity:generating?.6:1 }}>
+                {generating?'⏳ Gerando...':'↓ Baixar PDF'}
+              </button>
+            )}
+          </div>
         </div>
       </main>
 
+      {/* MOBILE BOTTOM NAV */}
+      {isMobile && (
+        <div style={{ position:'fixed', bottom:0, left:0, right:0, background:'#1A1612', borderTop:'1px solid #3A3530', display:'flex', zIndex:35 }}>
+          {[
+            { icon:'🏠', label:'Início', action:() => navigate('/') },
+            { icon:'📄', label:'Novo', action:handleNovoContrato },
+            { icon:'👤', label:'Perfil', action:() => navigate('/perfil') },
+          ].map(item => (
+            <button key={item.label} onClick={item.action}
+              style={{ flex:1, padding:'10px 4px', background:'none', border:'none', color:'#9A9088', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:2, fontFamily:'var(--font-body)' }}>
+              <span style={{ fontSize:18 }}>{item.icon}</span>
+              <span style={{ fontSize:9, fontWeight:600, letterSpacing:'.04em', textTransform:'uppercase' }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* TOAST */}
       {toast && (
-        <div style={{ position:'fixed', bottom:28, right:28, background: toast.ok ? 'var(--green)' : 'var(--accent)', color:'#fff', padding:'12px 20px', borderRadius:4, fontSize:14, fontWeight:500, boxShadow:'0 8px 32px rgba(0,0,0,.15)', zIndex:999, animation:'slideUp .25s ease' }}>
+        <div style={{ position:'fixed', bottom: isMobile?70:24, right: isMobile?16:24, left: isMobile?16:'auto', background: toast.ok?'var(--green)':'var(--accent)', color:'#fff', padding:'12px 18px', borderRadius:4, fontSize:13, fontWeight:500, boxShadow:'0 8px 32px rgba(0,0,0,.15)', zIndex:999, animation:'slideUp .25s ease', textAlign:'center' }}>
           {toast.msg}
-          <style>{`@keyframes slideUp { from { transform:translateY(12px);opacity:0 } to { transform:translateY(0);opacity:1 } }`}</style>
+          <style>{`@keyframes slideUp { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }`}</style>
         </div>
       )}
     </div>
