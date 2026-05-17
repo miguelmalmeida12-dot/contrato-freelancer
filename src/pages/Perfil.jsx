@@ -1,9 +1,10 @@
 // src/pages/Perfil.jsx
 // Página de perfil do assinante com contratos salvos, responsiva para mobile
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContratos } from '../hooks/useContratos.js'
+import { getUser, isLoggedIn, isPremium, isAdmin, logout, labelPlano, verificarLimiteFree } from '../lib/auth.js'
 
 const TIPO_CORES = {
   servicos:   { bg: '#EEF2FF', text: '#3730A3', label: 'Prestação de Serviços' },
@@ -115,13 +116,23 @@ function ContratoCard({ contrato, onAbrir, onRemover, onStatus }) {
 export default function Perfil() {
   const navigate = useNavigate()
   const { contratos, removerContrato, atualizarStatus } = useContratos()
-  const [aba, setAba] = useState('contratos') // 'contratos' | 'conta'
-  const [filtro, setFiltro] = useState('todos') // 'todos' | 'rascunho' | 'assinado'
+  const [aba, setAba] = useState('contratos')
+  const [filtro, setFiltro] = useState('todos')
   const [busca, setBusca] = useState('')
 
-  const plano = localStorage.getItem('plano_ativo') || 'mensal'
-  const email = localStorage.getItem('plano_email') || '—'
-  const desde = localStorage.getItem('plano_desde')
+  // Guard — redireciona se não logado
+  useEffect(() => {
+    if (!isLoggedIn()) navigate('/', { replace: true })
+  }, [])
+
+  const user   = getUser()
+  const premium = isPremium()
+  const admin   = isAdmin()
+  const limite  = verificarLimiteFree()
+
+  const plano = user?.plano || 'free'
+  const email = user?.email || '—'
+  const desde = user?.desde
 
   // Filtra e busca
   const contratosFiltrados = contratos.filter(c => {
@@ -163,13 +174,13 @@ export default function Perfil() {
         </span>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <button
-            onClick={() => navigate('/app')}
+            onClick={() => { logout(); navigate('/') }}
             style={{ padding: isMobile ? '7px 12px' : '8px 18px', background: '#C8502A', color: '#fff', border: 'none', borderRadius: 3, fontSize: isMobile ? 12 : 13, fontWeight: 600, cursor: 'pointer' }}
           >
             + Novo contrato
           </button>
           <button
-            onClick={() => { localStorage.removeItem('plano_ativo'); navigate('/') }}
+            onClick={() => { logout(); navigate('/') }}
             style={{ padding: '7px 12px', background: 'none', border: '1px solid #3A3530', color: '#9A9088', borderRadius: 3, fontSize: 12, cursor: 'pointer' }}
           >
             Sair
@@ -195,11 +206,16 @@ export default function Perfil() {
             {email !== '—' ? email[0].toUpperCase() : 'U'}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1612', marginBottom: 2 }}>{email}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: plano === 'vitalicio' ? '#FEF3ED' : '#EEF2FF', color: plano === 'vitalicio' ? '#9A3412' : '#3730A3' }}>
-                Plano {plano === 'vitalicio' ? 'Vitalício' : 'Pro Mensal'}
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1612', marginBottom: 4 }}>{email}</div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems:'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 20,
+                background: admin?'#7E22CE': premium?'#FEF3ED':'#F3F4F6',
+                color: admin?'#fff': premium?'#9A3412':'#374151' }}>
+                {admin ? '👑 Administrador' : premium ? `⭐ Plano ${labelPlano(plano)}` : '🆓 Plano Gratuito'}
               </span>
+              {!premium && !admin && (
+                <span style={{ fontSize:11, color:'#6B7280' }}>{limite.usados}/2 contratos usados este mês</span>
+              )}
               {desde && <span style={{ fontSize: 11, color: '#A09890' }}>Desde {fmt(desde)}</span>}
             </div>
           </div>
@@ -323,9 +339,10 @@ export default function Perfil() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1612', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '.06em' }}>Dados da conta</div>
               {[
                 { label: 'E-mail', value: email },
-                { label: 'Plano', value: plano === 'vitalicio' ? 'Vitalício — Acesso permanente' : 'Pro Mensal — R$37,00/mês' },
+                { label: 'Plano', value: admin ? 'Administrador (acesso total)' : premium ? `${labelPlano(plano)} — acesso ilimitado` : `Gratuito — ${limite.restantes} contrato(s) restante(s) este mês` },
+                { label: 'Verificado', value: user?.pagamentoVerificado ? '✅ Pagamento confirmado' : plano === 'free' ? '🆓 Plano gratuito' : '—' },
                 { label: 'Membro desde', value: desde ? fmt(desde) : '—' },
-                { label: 'Contratos gerados', value: String(stats.total) },
+                { label: 'Contratos salvos', value: String(stats.total) },
               ].map(row => (
                 <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F3F0EB', flexWrap: 'wrap', gap: 4 }}>
                   <span style={{ fontSize: 13, color: '#5C5448' }}>{row.label}</span>
@@ -359,7 +376,7 @@ export default function Perfil() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1A1612', marginBottom: 8 }}>Encerrar sessão</div>
               <div style={{ fontSize: 13, color: '#5C5448', marginBottom: 12 }}>Você será redirecionado para a página inicial.</div>
               <button
-                onClick={() => { localStorage.removeItem('plano_ativo'); navigate('/') }}
+                onClick={() => { logout(); navigate('/') }}
                 style={{ padding: '9px 18px', background: 'none', border: '1.5px solid #E2DDD6', color: '#5C5448', borderRadius: 4, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
               >
                 Sair da conta

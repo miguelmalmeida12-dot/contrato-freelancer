@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContratos } from '../hooks/useContratos.js'
+import { isLoggedIn, isPremium, isAdmin, getUser, verificarLimiteFree, registrarUsoContrato, logout } from '../lib/auth.js'
 
 // ─── DADOS ────────────────────────────────────────────────────────────────────
 
@@ -652,6 +653,18 @@ export default function Gerador() {
   const navigate = useNavigate()
   const { salvarContrato } = useContratos()
 
+  // ── GUARD: redireciona para login se não estiver logado ────────────────────
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      navigate('/', { replace: true })
+    }
+  }, [])
+
+  const user    = getUser()
+  const premium = isPremium()
+  const admin   = isAdmin()
+  const limite  = verificarLimiteFree()
+
   const [tipo, setTipo] = useState('servicos')
   const [step, setStep] = useState(0)
   const [data, setData] = useState({})
@@ -717,6 +730,15 @@ export default function Gerador() {
   // ─── PDF: ÚNICO MÉTODO FUNCIONAL ────────────────────────────────────────────
   // Usa window.open + print() — funciona em todos os browsers sem dependências
   const handleDownload = () => {
+    // Verifica limite free ANTES de gerar
+    if (!premium && !admin) {
+      const lim = verificarLimiteFree()
+      if (!lim.permitido) {
+        toast_(`Você atingiu o limite de 2 contratos/mês do plano grátis. Faça upgrade para continuar.`, false)
+        return
+      }
+    }
+
     setGenerating(true)
     try {
       const html = buildPdf(tipo, data, clausulas)
@@ -740,6 +762,8 @@ export default function Gerador() {
         setTimeout(() => {
           win.focus()
           win.print()
+          // Registra uso apenas para free
+          if (!premium && !admin) registrarUsoContrato()
           setGenerating(false)
           toast_('✓ Diálogo de PDF aberto! Selecione "Salvar como PDF".')
         }, 500)
@@ -785,6 +809,12 @@ export default function Gerador() {
 
         {/* Ações */}
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          {/* Badge de plano */}
+          {!isMobile && user && (
+            <span style={{ fontSize:11, fontWeight:700, padding:'3px 10px', borderRadius:20, background: admin?'#7E22CE': premium?'#C8502A':'#3A3530', color:'#F7F5F0' }}>
+              {admin ? '👑 Admin' : premium ? `⭐ ${user.plano}` : `🆓 ${limite.usados}/2 contratos`}
+            </span>
+          )}
           {!isMobile && (
             <button onClick={() => navigate('/perfil')}
               style={{ padding:'6px 14px', background:'none', border:'1px solid #3A3530', color:'#9A9088', borderRadius:3, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
@@ -931,6 +961,24 @@ export default function Gerador() {
                 </div>
 
                 <PainelIA clausulas={clausulas} alertas={alertas} sugestoes={sugestoes} loading={loadingAI} onGerar={gerarClausulas} temDados={temDados} />
+
+                {/* BANNER LIMITE FREE */}
+                {!premium && !admin && (
+                  <div style={{ background: limite.permitido ? '#F0FDF4' : '#FEF2F2', border:`1px solid ${limite.permitido ? '#BBF7D0' : '#FECACA'}`, borderRadius:6, padding:'12px 16px', marginBottom:16, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10 }}>
+                    <div>
+                      <div style={{ fontSize:13, fontWeight:700, color: limite.permitido ? '#166534' : '#B91C1C' }}>
+                        {limite.permitido ? `🆓 Plano Gratuito — ${limite.restantes} contrato(s) restante(s) este mês` : '🚫 Limite mensal atingido'}
+                      </div>
+                      <div style={{ fontSize:12, color: limite.permitido ? '#15803D' : '#DC2626', marginTop:2 }}>
+                        {limite.permitido ? 'Faça upgrade para contratos ilimitados.' : 'Você usou seus 2 contratos gratuitos deste mês.'}
+                      </div>
+                    </div>
+                    <button onClick={() => navigate('/')}
+                      style={{ padding:'8px 16px', background:'#C8502A', color:'#fff', border:'none', borderRadius:3, fontSize:12, fontWeight:600, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>
+                      {limite.permitido ? 'Ver planos' : 'Fazer upgrade →'}
+                    </button>
+                  </div>
+                )}
 
                 {/* RESUMO */}
                 <div style={{ background:'#fff', border:'1px solid #E2DDD6', borderRadius:6, padding: isMobile?'14px 16px':'20px 24px' }}>
