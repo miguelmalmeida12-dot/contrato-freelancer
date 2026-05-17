@@ -120,12 +120,10 @@ export default function Perfil() {
   const [filtro, setFiltro] = useState('todos')
   const [busca, setBusca] = useState('')
 
-  // Guard síncrono — sem flash de redirect
-  const [autorizado] = useState(() => isLoggedIn())
-  useEffect(() => {
-    if (!autorizado) navigate('/', { replace: true })
-  }, [autorizado])
-  if (!autorizado) return null
+  // Guard síncrono
+  const logado = isLoggedIn()
+  useEffect(() => { if (!logado) navigate('/', { replace: true }) }, [logado])
+  if (!logado) return null
 
   const user    = getUser()
   const premium = isPremium()
