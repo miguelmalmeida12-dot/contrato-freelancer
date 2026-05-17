@@ -653,12 +653,19 @@ export default function Gerador() {
   const navigate = useNavigate()
   const { salvarContrato } = useContratos()
 
-  // ── GUARD: redireciona para login se não estiver logado ────────────────────
+  // ── GUARD SÍNCRONO: lê sessão imediatamente, antes de qualquer render ────────
+  // Não usa useEffect para evitar flash de redirect em usuários logados.
+  // isLoggedIn() é síncrono (lê localStorage diretamente).
+  const [autorizado] = useState(() => isLoggedIn())
+
   useEffect(() => {
-    if (!isLoggedIn()) {
+    if (!autorizado) {
       navigate('/', { replace: true })
     }
-  }, [])
+  }, [autorizado])
+
+  // Se não autorizado, não renderiza nada (evita flash de conteúdo)
+  if (!autorizado) return null
 
   const user    = getUser()
   const premium = isPremium()
