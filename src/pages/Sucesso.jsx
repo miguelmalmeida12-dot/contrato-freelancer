@@ -1,42 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ativarPlanoPago, login, isLoggedIn } from '../lib/auth.js'
+import { ativarPlanoPago } from '../lib/auth.js'
 
 export default function Sucesso() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [pronto, setPronto] = useState(false)
 
   useEffect(() => {
-    const plano      = params.get('plano') || localStorage.getItem('tract_pag_plano') || 'mensal'
-    const email      = localStorage.getItem('tract_pag_email') || ''
-    const pagamentoId= params.get('payment_id') || params.get('collection_id') || 'mp_' + Date.now()
-
-    if (email) {
-      // Ativa o plano pago na lib de auth — cria registro verificado
-      ativarPlanoPago(email, plano, pagamentoId)
-
-      // Se não houver sessão ativa, cria uma automaticamente
-      // (usuário que veio direto do checkout sem ter conta)
-      if (!isLoggedIn()) {
-        // Sessão temporária sem senha — usuário precisará cadastrar senha ao entrar
-        const chave = `tract_assinante_${btoa(email.trim().toLowerCase())}`
-        const raw = localStorage.getItem(chave)
-        if (raw) {
-          // Conta ativada — redireciona para login para criar sessão
-        }
-      }
-    }
-
-    // Limpa dados temporários de pagamento
+    const plano       = params.get('plano') || localStorage.getItem('tract_pag_plano') || 'mensal'
+    const email       = localStorage.getItem('tract_pag_email') || ''
+    const pagamentoId = params.get('payment_id') || params.get('collection_id') || 'mp_' + Date.now()
+    if (email) ativarPlanoPago(email, plano, pagamentoId)
     localStorage.removeItem('tract_pag_email')
     localStorage.removeItem('tract_pag_plano')
-    // Compatibilidade com versão anterior
+    // limpa chaves antigas
     localStorage.removeItem('plano_ativo')
     localStorage.removeItem('plano_email')
     localStorage.removeItem('plano_desde')
-
-    setPronto(true)
   }, [])
 
   const plano = params.get('plano') || 'mensal'
@@ -44,7 +24,7 @@ export default function Sucesso() {
   return (
     <div style={{ minHeight:'100vh', background:'#F7F5F0', display:'flex', alignItems:'center', justifyContent:'center', padding:32 }}>
       <div style={{ maxWidth:480, textAlign:'center' }}>
-        <div style={{ fontFamily:'Georgia,serif', fontSize:28, color:'#1A1612', marginBottom:8 }}>
+        <div style={{ fontFamily:'Georgia,serif', fontSize:26, color:'#1A1612', marginBottom:12 }}>
           TR<span style={{ color:'#C8502A' }}>A</span>CT
         </div>
         <div style={{ fontSize:56, marginBottom:20 }}>🎉</div>
@@ -59,7 +39,7 @@ export default function Sucesso() {
         </div>
         <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
           <button onClick={() => navigate('/')}
-            style={{ padding:'12px 24px', background:'#1A1612', color:'#F7F5F0', border:'none', borderRadius:3, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+            style={{ padding:'12px 28px', background:'#1A1612', color:'#F7F5F0', border:'none', borderRadius:3, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
             Fazer login →
           </button>
           <button onClick={() => navigate('/app')}
