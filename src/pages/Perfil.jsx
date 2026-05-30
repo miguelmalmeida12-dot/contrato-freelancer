@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContratos } from '../hooks/useContratos.js'
 import { lerSessao, logout, isPremium, isAdmin, verificarLimiteFree, labelPlano } from '../lib/auth.js'
@@ -67,29 +67,21 @@ function ContratoCard({ contrato, onAbrir, onRemover, onStatus }) {
 export default function Perfil() {
   const navigate = useNavigate()
   const { contratos, removerContrato, atualizarStatus } = useContratos()
-  const [aba, setAba]     = useState('contratos')
+  const [aba, setAba]       = useState('contratos')
   const [filtro, setFiltro] = useState('todos')
   const [busca, setBusca]   = useState('')
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
 
-  // ── GUARD: lê localStorage diretamente, sem import indireto ───────────────
-  const sessaoRef = useRef(lerSessao())
   useEffect(() => {
-    const s = lerSessao()
-    if (!s) {
-      navigate('/', { replace:true })
-    }
     const fn = () => setIsMobile(window.innerWidth < 640)
     window.addEventListener('resize', fn)
     return () => window.removeEventListener('resize', fn)
   }, [])
-  // Se não tem sessão, não renderiza nada
-  if (!sessaoRef.current) return null
-  // ────────────────────────────────────────────────────────────────────────
 
-  const sessao  = sessaoRef.current
-  const admin   = sessao.plano === 'admin'
-  const premium = ['mensal','vitalicio','admin'].includes(sessao.plano)
+  // Lê sessão sem redirect automático
+  const sessao  = lerSessao()
+  const admin   = sessao?.plano === 'admin'
+  const premium = ['mensal','vitalicio','admin'].includes(sessao?.plano)
   const limite  = verificarLimiteFree()
 
   const contratosFiltrados = contratos.filter(c => {
@@ -101,13 +93,12 @@ export default function Perfil() {
   // ── FIX: navega para /app passando o tipo selecionado via sessionStorage ──
   const irParaGerador = useCallback((tipo = null) => {
     if (tipo) sessionStorage.setItem('tract_tipo_inicial', tipo)
-    // Pequeno delay para garantir que sessionStorage está gravado antes do navigate
-    setTimeout(() => navigate('/app'), 10)
+    navigate('/app')
   }, [navigate])
 
   const handleAbrir = useCallback((contrato) => {
     sessionStorage.setItem('tract_carregar_contrato', JSON.stringify(contrato))
-    setTimeout(() => navigate('/app'), 10)
+    navigate('/app')
   }, [navigate])
 
   const handleLogout = () => { logout(); navigate('/') }

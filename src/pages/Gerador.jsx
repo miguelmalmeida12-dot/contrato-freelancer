@@ -1008,22 +1008,15 @@ export default function Gerador() {
   const navigate = useNavigate()
   const { salvarContrato } = useContratos()
 
-  // ── GUARD: lê localStorage diretamente ────────────────────────────────────
-  const sessaoInicial = lerSessao()
-  const [autorizado] = useState(() => !!sessaoInicial)
-  useEffect(() => {
-    if (!lerSessao()) navigate('/', { replace: true })
-  }, [])
-  if (!autorizado) return null
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const sessao  = sessaoInicial
+  // Lê sessão uma vez — sem useEffect, sem redirect automático
+  // A proteção de rota fica na Landing (quem não está logado não chega aqui)
+  const sessao  = lerSessao()
   const admin   = sessao?.plano === 'admin'
   const premium = ['mensal','vitalicio','admin'].includes(sessao?.plano)
   const limite  = verificarLimiteFree()
 
-  // Tipo inicial — pode vir do Perfil via sessionStorage
-  const tipoInicial = (() => {
+  // Tipo inicial — pode vir do Perfil ou Landing via sessionStorage
+  const [tipo, setTipo] = useState(() => {
     try {
       const t = sessionStorage.getItem('tract_tipo_inicial')
       if (t && ['servicos','software','design','influencer'].includes(t)) {
@@ -1032,10 +1025,15 @@ export default function Gerador() {
       }
     } catch {}
     return 'servicos'
-  })()
+  })
 
-  const [tipo, setTipo] = useState(tipoInicial)
-  const [step, setStep] = useState(tipoInicial !== 'servicos' ? 1 : 0)
+  const [step, setStep] = useState(() => {
+    try {
+      const t = sessionStorage.getItem('tract_tipo_inicial')
+      return (t && t !== 'servicos') ? 1 : 0
+    } catch { return 0 }
+  })
+
   const [data, setData] = useState({})
   const [clausulas, setClausulas] = useState(null)
   const [alertas, setAlertas] = useState(null)
